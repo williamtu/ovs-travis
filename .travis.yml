@@ -39,4 +39,4 @@ script: ./.travis/build.sh $OPTS
 notifications:
   email:
     recipients:
-      - build@openvswitch.org
+      - u9012063@gmail.com 
