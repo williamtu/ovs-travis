@@ -39,4 +39,4 @@ script: ./.travis/build.sh $OPTS
 notifications:
   email:
     recipients:
-      - u9012063@gmail.com 
+      - u9012063@gmail.com
