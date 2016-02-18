@@ -28,7 +28,6 @@ script:
   - ./boot.sh && ./configure && make
   - make check
   - make check-valgrind TESTSUITEFLAGS='1000-1500' 
-
 notifications:
   email:
     recipients:
