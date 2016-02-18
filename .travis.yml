@@ -21,8 +21,8 @@ env:
 
 script:
   - ./boot.sh && ./configure && make
-  - make check
-  - make check-valgrind TESTSUITEFLAGS='1000-1500' 
+  - make check TESTSUITEFLAGS='1000-1100'
+  - make check-valgrind TESTSUITEFLAGS='1000-1100' 
   - grep -r "definitely lost" tests/testsuite.dir/
 notifications:
   email:
