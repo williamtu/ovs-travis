@@ -24,16 +24,12 @@ sudo: false
 env:
   - KERNEL=3.10.96
 
-matrix:
-  include:
-    - os: osx
-      compiler: clang
-      env: OPTS="--disable-ssl"
 
-script: 
-    - ./boot.sh
-    - ./configure 
-    - make check TESTSUITEFLAGS='100'
+script:
+  - ./boot.sh && ./configure && make
+  - make check TESTSUITEFLAGS='1100'
+  - make check-valgrind TESTSUITEFLAGS='1100' 
+  - grep -r "definitely lost" tests/testsuite.dir/
 
 notifications:
   email:
