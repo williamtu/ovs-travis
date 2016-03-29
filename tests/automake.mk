@@ -209,6 +209,7 @@ valgrind_invalid_free='(Invalid|Mismatched) free'
 valgrind_uninit_jmp='Conditional jump or move depends on uninitialised value'
 valgrind_uninit_syscall='Syscall param write(buf) points to uninitialised'
 valgrind_overlap='Source and destination overlap in'
+valgrind_output_dir=$(abs_top_srcdir)/tests/testsuite.dir/*/valgrind*
 
 VALGRIND = valgrind --log-file=valgrind.%p --leak-check=full --errors-for-leak-kinds=definite \
 	--suppressions=$(abs_top_srcdir)/tests/glibc.supp \
@@ -224,33 +225,33 @@ check-valgrind: all tests/atconfig tests/atlocal $(TESTSUITE) \
 	@echo 'Valgrind output can be found in tests/testsuite.dir/*/valgrind.*'
 	@echo '----------------------------------------------------------------------'
 	@echo -n 'Check definitely memory leak... '
-	@if $(EGREP) -r $(valgrind_def_leak) tests/testsuite.dir/*/valgrind* > /dev/null; \
+	@if $(EGREP) -r $(valgrind_def_leak) $(valgrind_output_dir) > /dev/null; \
 	then echo 'FAILED'; \
 	else echo 'ok';     \
 	fi
 	@echo -n 'Check invalid read/write... '
-	@if $(EGREP) -r $(valgrind_invalid_rw) tests/testsuite.dir/*/valgrind* > /dev/null; \
+	@if $(EGREP) -r $(valgrind_invalid_rw) $(valgrind_output_dir) > /dev/null; \
 	then echo 'FAILED'; \
 	else echo 'ok';     \
 	fi
 	@echo -n 'Check invalid free... '
-	@if $(EGREP) -r $(valgrind_invalid_free) tests/testsuite.dir/*/valgrind* > /dev/null; \
+	@if $(EGREP) -r $(valgrind_invalid_free) $(valgrind_output_dir) > /dev/null; \
 	then echo 'FAILED'; \
 	else echo 'ok';     \
 	fi
 	@echo -n 'Check use of uninitialised values... '
-	@if $(EGREP) -r $(valgrind_uninit_jmp) tests/testsuite.dir/*/valgrind* > /dev/null; \
+	@if $(EGREP) -r $(valgrind_uninit_jmp) $(valgrind_output_dir) > /dev/null; \
 	then echo 'FAILED'; \
 	else echo 'ok';     \
 	fi
 	@echo -n 'Check use of uninitialised or unaddressable values in system calls... '
-	@if $(EGREP) -r $(valgrind_uninit_syscall) tests/testsuite.dir/*/valgrind* > /dev/null; \
+	@if $(EGREP) -r $(valgrind_uninit_syscall) $(valgrind_output_dir) > /dev/null; \
 	then echo 'FAILED'; \
 	else echo 'ok';     \
 	fi
 	@echo -n 'Check overlapping source and destination blocks... '
-	@if $(EGREP) -r $(valgrind_overlap) tests/testsuite.dir/*/valgrind* > /dev/null; \
-		then echo 'FAILED'; \
+	@if $(EGREP) -r $(valgrind_overlap) $(valgrind_output_dir) > /dev/null; \
+	then echo 'FAILED'; \
 	else echo 'ok';     \
 	fi
 	@echo '----------------------------------------------------------------------'
