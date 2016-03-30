@@ -104,10 +104,9 @@ if [ "$TESTSUITE" ] && [ "$CC" != "clang" ]; then
         cat */_build/tests/testsuite.log
         exit 1
     fi
-
-fi
-if ! make check-valgrind; then
-	exit 1
+	if ! make check-valgrind TESTSUITEFLAGS='1100-1120'; then
+		exit 1
+	fi
 fi
 
 exit 0

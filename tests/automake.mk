@@ -201,17 +201,62 @@ $(valgrind_wrappers): tests/valgrind-wrapper.in
 CLEANFILES += $(valgrind_wrappers)
 EXTRA_DIST += tests/valgrind-wrapper.in
 
+# Valgrind error pattern, see:
+#     http://valgrind.org/docs/manual/mc-manual.html#mc-manual.errormsgs
+valgrind_def_leak='definitely lost in'
+valgrind_invalid_rw='Invalid (write|read) of size'
+valgrind_invalid_free='(Invalid|Mismatched) free'
+valgrind_uninit_jmp='Conditional jump or move depends on uninitialised value'
+valgrind_uninit_syscall='Syscall param write(buf) points to uninitialised'
+valgrind_overlap='Source and destination overlap in'
+valgrind_output_dir=tests/testsuite.dir/[0-9]*/valgrind*
+
 VALGRIND = valgrind --log-file=valgrind.%p --leak-check=full \
 	--suppressions=$(abs_top_srcdir)/tests/glibc.supp \
 	--suppressions=$(abs_top_srcdir)/tests/openssl.supp --num-callers=20
 EXTRA_DIST += tests/glibc.supp tests/openssl.supp
 check-valgrind: all tests/atconfig tests/atlocal $(TESTSUITE) \
                 $(valgrind_wrappers) $(check_DATA)
-	$(SHELL) '$(TESTSUITE)' -C tests CHECK_VALGRIND=true VALGRIND='$(VALGRIND)' AUTOTEST_PATH='tests/valgrind:$(AUTOTEST_PATH)' -d $(TESTSUITEFLAGS)
+	-$(SHELL) '$(TESTSUITE)' -C tests CHECK_VALGRIND=true VALGRIND='$(VALGRIND)' AUTOTEST_PATH='tests/valgrind:$(AUTOTEST_PATH)' -d $(TESTSUITEFLAGS)
 	@echo
 	@echo '----------------------------------------------------------------------'
-	@echo 'Valgrind output can be found in tests/testsuite.dir/*/valgrind.*'
+	@echo -n Total errors: `find tests/testsuite.dir -name "valgrind.*" | xargs cat | \
+           sed -n 's/.*ERROR\ SUMMARY:\ \([0-9]*\)\ errors.*/.+\1/p' | bc | tail -1`'.'
+	@echo ' Valgrind output can be found in tests/testsuite.dir/*/valgrind.*'
 	@echo '----------------------------------------------------------------------'
+	@echo -n 'Check definitely memory leak... '
+	@if $(EGREP) -r $(valgrind_def_leak) $(valgrind_output_dir) > /dev/null; \
+    then echo 'FAILED'; \
+    else echo 'ok';     \
+    fi
+	@echo -n 'Check invalid read/write... '
+	@if $(EGREP) -r $(valgrind_invalid_rw) $(valgrind_output_dir) > /dev/null; \
+    then echo 'FAILED'; \
+    else echo 'ok';     \
+    fi
+	@echo -n 'Check invalid free... '
+	@if $(EGREP) -r $(valgrind_invalid_free) $(valgrind_output_dir) > /dev/null; \
+	then echo 'FAILED'; \
+	else echo 'ok';     \
+	fi
+	@echo -n 'Check use of uninitialised values... '
+	@if $(EGREP) -r $(valgrind_uninit_jmp) $(valgrind_output_dir) > /dev/null; \
+	then echo 'FAILED'; \
+	else echo 'ok';     \
+	fi
+	@echo -n 'Check use of uninitialised or unaddressable values in system calls... '
+	@if $(EGREP) -r $(valgrind_uninit_syscall) $(valgrind_output_dir) > /dev/null; \
+	then echo 'FAILED'; \
+	else echo 'ok';     \
+	fi
+	@echo -n 'Check overlapping source and destination blocks... '
+	@if $(EGREP) -r $(valgrind_overlap) $(valgrind_output_dir) > /dev/null; \
+	then echo 'FAILED'; \
+	else echo 'ok';     \
+	fi
+	@echo '---------------------------------------------------------------------------------'
+
+
 
 # OFTest support.
 
