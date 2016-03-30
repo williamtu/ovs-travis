@@ -214,7 +214,7 @@ valgrind_overlap='Source and destination overlap in'
 #valgrind_output_dir=$(abs_top_srcdir)/tests/
 valgrind_output_dir=$(abs_top_srcdir)/tests/dir/
 # ?
-valgrind_output_dir=$(abs_top_srcdir)/tests/testsuitedotdir/
+valgrind_output_dir=$(abs_top_srcdir)/tests/testsuite.dir/
 
 #VALGRIND = valgrind --log-file=$(valgrind_output_dir)valgrind.%p --leak-check=full --errors-for-leak-kinds=definite
 #VALGRIND = valgrind --log-file=$(valgrind_output_dir)/valgrind.%p 
