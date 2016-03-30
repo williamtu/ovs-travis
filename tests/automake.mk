@@ -218,14 +218,12 @@ EXTRA_DIST += tests/glibc.supp tests/openssl.supp
 check-valgrind: all tests/atconfig tests/atlocal $(TESTSUITE) \
                 $(valgrind_wrappers) $(check_DATA)
 	-$(SHELL) '$(TESTSUITE)' -C tests CHECK_VALGRIND=true VALGRIND='$(VALGRIND)' AUTOTEST_PATH='tests/valgrind:$(AUTOTEST_PATH)' -d $(TESTSUITEFLAGS)
-	cat $(abs_top_srcdir)/valgrind.1234
 	@echo
 	@echo '----------------------------------------------------------------------'
 	@echo Total errors: `find tests/testsuite.dir -name "valgrind.*" | xargs cat | \
 	        sed -n 's/.*ERROR\ SUMMARY:\ \([0-9]*\)\ errors.*/.+\1/p' | bc | tail -1`
 	@echo 'Valgrind output can be found in tests/testsuite.dir/*/valgrind.*'
 	@echo '----------------------------------------------------------------------'
-	ls -al $(valgrind_output_dir)/1100
 	echo -n 'Check definitely memory leak... '
 	if $(EGREP) -r $(valgrind_def_leak) $(valgrind_output_dir) > /dev/null; \
 	then echo 'FAILED'; \

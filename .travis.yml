@@ -15,6 +15,7 @@ addons:
       - libjemalloc1
       - libjemalloc-dev
       - valgrind
+      - valgrind-dev
 
 before_install: ./.travis/${TRAVIS_OS_NAME}-prepare.sh
 
@@ -28,6 +29,8 @@ env:
 
 script:
   - ./boot.sh && ./configure && make
+  - valgrind --log-file=./valgrind.123 ls
+  - cat ./valgrind.123
   - make check-valgrind TESTSUITEFLAGS='1100' 
   - ls -al /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/
   - ls -al /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/1100/
