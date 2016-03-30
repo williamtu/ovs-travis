@@ -28,13 +28,14 @@ env:
 
 
 script:
-  - ./boot.sh && ./configure && make
+  #- ./boot.sh && ./configure && make
   - valgrind --log-file=./valgrind.%p ls
+  - ls valgrind*
   - cat ./valgrind.*
-#  - make check-valgrind TESTSUITEFLAGS='1100' 
-#  - ls -al /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/
-#  - ls -al /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/1100/
-#  - grep -r "definitely lost" tests/testsuite.dir/
+  #- make check-valgrind TESTSUITEFLAGS='1100' 
+  #- ls -al /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/
+  #- ls -al /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/1100/
+  #- grep -r "definitely lost" tests/testsuite.dir/
 
 notifications:
   email:
