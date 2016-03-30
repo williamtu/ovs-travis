@@ -213,8 +213,8 @@ valgrind_overlap='Source and destination overlap in'
 valgrind_output_dir=$(abs_top_srcdir)/tests/testsuite.dir/
 
 #VALGRIND = valgrind --log-file=$(valgrind_output_dir)valgrind.%p --leak-check=full --errors-for-leak-kinds=definite
-VALGRIND = valgrind --log-file=$(valgrind_output_dir)/valgrind.%p --leak-check=full 
-EXTRA_DIST += tests/glibc.supp tests/openssl.supp
+VALGRIND = valgrind --log-file=$(valgrind_output_dir)/valgrind.%p 
+#EXTRA_DIST += tests/glibc.supp tests/openssl.supp
 check-valgrind: all tests/atconfig tests/atlocal $(TESTSUITE) \
                 $(valgrind_wrappers) $(check_DATA)
 	-$(SHELL) '$(TESTSUITE)' -C tests CHECK_VALGRIND=true VALGRIND='$(VALGRIND)' AUTOTEST_PATH='tests/valgrind:$(AUTOTEST_PATH)' -d $(TESTSUITEFLAGS)
@@ -224,6 +224,7 @@ check-valgrind: all tests/atconfig tests/atlocal $(TESTSUITE) \
 	        sed -n 's/.*ERROR\ SUMMARY:\ \([0-9]*\)\ errors.*/.+\1/p' | bc | tail -1`
 	@echo 'Valgrind output can be found in tests/testsuite.dir/*/valgrind.*'
 	@echo '----------------------------------------------------------------------'
+	ls -al $(valgrind_output_dir)/valgrind*
 	echo -n 'Check definitely memory leak... '
 	if $(EGREP) -r $(valgrind_def_leak) $(valgrind_output_dir) > /dev/null; \
 	then echo 'FAILED'; \
