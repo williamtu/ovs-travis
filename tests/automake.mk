@@ -211,7 +211,9 @@ valgrind_uninit_syscall='Syscall param write(buf) points to uninitialised'
 valgrind_overlap='Source and destination overlap in'
 #work
 #valgrind_output_dir=$(abs_top_srcdir)/
-valgrind_output_dir=$(abs_top_srcdir)/tests/
+#valgrind_output_dir=$(abs_top_srcdir)/tests/
+# ?
+valgrind_output_dir=$(abs_top_srcdir)/tests/testsuite.dir/
 
 #VALGRIND = valgrind --log-file=$(valgrind_output_dir)valgrind.%p --leak-check=full --errors-for-leak-kinds=definite
 VALGRIND = valgrind --log-file=$(valgrind_output_dir)/valgrind.%p 
