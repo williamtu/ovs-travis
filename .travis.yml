@@ -11,9 +11,6 @@ addons:
       - bc
       - gcc-multilib
       - libssl-dev
-      - llvm-dev
-      - libjemalloc1
-      - libjemalloc-dev
       - valgrind
 
 before_install: ./.travis/${TRAVIS_OS_NAME}-prepare.sh
@@ -23,13 +20,8 @@ before_script: export PATH=$PATH:$HOME/bin
 sudo: false
 
 env:
-  - KERNEL=3.12.53
+  - KERNEL=3.10.96
 
-matrix:
-  include:
-    - os: osx
-      compiler: clang
-      env: OPTS="--disable-ssl"
 
 script: ./.travis/${TRAVIS_OS_NAME}-build.sh $OPTS
 
