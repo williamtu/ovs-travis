@@ -28,8 +28,9 @@ script:
   - valgrind --log-file=$(pwd)/valgrind.%p --leak-check=full ls 
   - find . -name "valgrind.*"
   - ./boot.sh && ./configure && make
-  - make check-valgrind TESTSUITEFLAGS='1100' 
+  - make check-valgrind TESTSUITEFLAGS='1102' 
   - ls /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/
+  - ls /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/1102/
   - find . -name "valgrind.*" 
   - find /home/travis/build/williamtu/ovs-travis/ -name "valgrind.*"
 

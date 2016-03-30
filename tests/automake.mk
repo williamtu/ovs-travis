@@ -233,7 +233,7 @@ check-valgrind: all tests/atconfig tests/atlocal $(TESTSUITE) \
 	        sed -n 's/.*ERROR\ SUMMARY:\ \([0-9]*\)\ errors.*/.+\1/p' | bc | tail -1`
 	@echo 'Valgrind output can be found in tests/testsuite.dir/*/valgrind.*'
 	@echo '----------------------------------------------------------------------'
-	ls -al $(valgrind_output_dir)/valgrind*
+	ls -al $(valgrind_output_dir)
 	echo -n 'Check definitely memory leak... '
 	if $(EGREP) -r $(valgrind_def_leak) $(valgrind_output_dir) > /dev/null; \
 	then echo 'FAILED'; \
