@@ -32,11 +32,12 @@ script:
   - ls a/b/c/d/e.dir/f/g/
   - ls valgrind*
   - cat ./valgrind.*
-  #- ./boot.sh && ./configure && make
-  #- make check-valgrind TESTSUITEFLAGS='1100' 
-  #- ls /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/
-  #- find . -name "valgrind.*" 
-  #- grep -r "definitely lost" tests/testsuite.dir/
+  - ./boot.sh && ./configure && make
+  - make check-valgrind TESTSUITEFLAGS='1100' 
+  - ls /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/
+  - find . -name "valgrind.*" 
+  - find /home/travis/build/williamtu/ovs-travis/ -name "valgrind.*"
+  - grep -r "definitely lost" tests/testsuite.dir/
 
 notifications:
   email:
