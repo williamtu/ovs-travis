@@ -210,7 +210,7 @@ valgrind_uninit_jmp='Conditional jump or move depends on uninitialised value'
 valgrind_uninit_syscall='Syscall param write(buf) points to uninitialised'
 valgrind_overlap='Source and destination overlap in'
 
-valgrind_output_dir=$(abs_top_srcdir)/tests/testsuite.dir/
+valgrind_output_dir=$(abs_top_srcdir)/
 
 #VALGRIND = valgrind --log-file=$(valgrind_output_dir)valgrind.%p --leak-check=full --errors-for-leak-kinds=definite
 VALGRIND = valgrind --log-file=$(valgrind_output_dir)/valgrind.%p 
