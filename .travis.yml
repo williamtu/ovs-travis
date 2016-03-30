@@ -26,10 +26,10 @@ env:
 script:
   - valgrind --help | grep leak
   - valgrind --help 
-  - mkdir -p 12345678999/aaaaaaaaaa/bbbbbbbbbb/ccccc/ddddd/e.dir/fffff/ggggg
-  - valgrind --log-file=./12345678999/aaaaaaaaaa/bbbbbbbbbb/ccccc/ddddd/e.dir/fffff/ggggg/valgrind.%p --leak-check=full ls 
+  - mkdir -p 12345678999/aaaaaaaaaa/bbbbbbbbbb/ccccc/ddddd/testsuite.dir/fffff/ggggg
+  - valgrind --log-file=./12345678999/aaaaaaaaaa/bbbbbbbbbb/ccccc/ddddd/testsuite.dir/fffff/ggggg/valgrind.%p --leak-check=full ls 
   - find . -name "valgrind.*"
-  - ls 12345678999/aaaaaaaaaa/bbbbbbbbbb/ccccc/ddddd/e.dir/fffff/ggggg/
+  - ls 12345678999/aaaaaaaaaa/bbbbbbbbbb/ccccc/ddddd/testsuite.dir/fffff/ggggg/
   - ls valgrind*
   - cat ./valgrind.*
   - ./boot.sh && ./configure && make
