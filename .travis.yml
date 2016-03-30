@@ -11,11 +11,7 @@ addons:
       - bc
       - gcc-multilib
       - libssl-dev
-      - llvm-dev
-      - libjemalloc1
-      - libjemalloc-dev
       - valgrind
-      - valgrind-dev
 
 before_install: ./.travis/${TRAVIS_OS_NAME}-prepare.sh
 
@@ -29,13 +25,14 @@ env:
 
 script:
   - valgrind --help | grep leak
+  - valgrind --help 
   - valgrind --log-file=./valgrind.%p --leak-check=full ls 
   - ls valgrind*
   - cat ./valgrind.*
   - ./boot.sh && ./configure && make
   - make check-valgrind TESTSUITEFLAGS='1100' 
-  - ls  /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/
-  - ls  /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/1100/
+  - ls /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/
+  - find . -name "valgrind.*" 
   - grep -r "definitely lost" tests/testsuite.dir/
 
 notifications:
