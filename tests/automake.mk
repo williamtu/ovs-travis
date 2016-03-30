@@ -215,11 +215,11 @@ valgrind_overlap='Source and destination overlap in'
 #valgrind_output_dir=$(abs_top_srcdir)/tests/dir/
 #valgrind_output_dir=$(abs_top_srcdir)/valgrind-results/
 #valgrind_output_dir=$(abs_top_srcdir)/tests/testsuite.dir/
-# work
+# not work
 valgrind_output_dir=$(abs_top_srcdir)/tests/testsuite.dir/*/valgrind*
 
 #VALGRIND = valgrind --log-file=$(valgrind_output_dir)valgrind.%p --leak-check=full --errors-for-leak-kinds=definite
-VALGRIND = valgrind --log-file=./valgrind.%p --leak-check=full \
+VALGRIND = valgrind --log-file=$(pwd)/valgrind.%p --leak-check=full \
  --suppressions=$(abs_top_srcdir)/tests/glibc.supp \
  --suppressions=$(abs_top_srcdir)/tests/openssl.supp --num-callers=20 
 EXTRA_DIST += tests/glibc.supp tests/openssl.supp

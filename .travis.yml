@@ -25,18 +25,13 @@ env:
 
 script:
   - valgrind --help 
-  - mkdir -p /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/aaa 
-  - valgrind --log-file=/home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/aaa/valgrind.%p --leak-check=full ls 
+  - valgrind --log-file=$(pwd)/valgrind.%p --leak-check=full ls 
   - find . -name "valgrind.*"
-  - ls /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/aaa/ 
-  - ls valgrind*
-  - cat ./valgrind.*
   - ./boot.sh && ./configure && make
   - make check-valgrind TESTSUITEFLAGS='1100' 
   - ls /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/
   - find . -name "valgrind.*" 
   - find /home/travis/build/williamtu/ovs-travis/ -name "valgrind.*"
-  - grep -r "definitely lost" tests/testsuite.dir/
 
 notifications:
   email:
