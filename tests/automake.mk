@@ -218,6 +218,7 @@ valgrind_overlap='Source and destination overlap in'
 # not work
 valgrind_output_dir=$(abs_top_srcdir)/tests/testsuite.dir/*/valgrind*
 
+#mkdir -p $(valgrind_output_dir)
 #VALGRIND = valgrind --log-file=$(valgrind_output_dir)valgrind.%p --leak-check=full --errors-for-leak-kinds=definite
 VALGRIND = valgrind --log-file=$(pwd)/valgrind.%p --leak-check=full \
  --suppressions=$(abs_top_srcdir)/tests/glibc.supp \
@@ -225,7 +226,6 @@ VALGRIND = valgrind --log-file=$(pwd)/valgrind.%p --leak-check=full \
 EXTRA_DIST += tests/glibc.supp tests/openssl.supp
 check-valgrind: all tests/atconfig tests/atlocal $(TESTSUITE) \
                 $(valgrind_wrappers) $(check_DATA)
-	#mkdir -p $(valgrind_output_dir)
 	-$(SHELL) '$(TESTSUITE)' -C tests CHECK_VALGRIND=true VALGRIND='$(VALGRIND)' AUTOTEST_PATH='tests/valgrind:$(AUTOTEST_PATH)' -d $(TESTSUITEFLAGS)
 	@echo
 	@echo '----------------------------------------------------------------------'
