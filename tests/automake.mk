@@ -214,17 +214,18 @@ valgrind_overlap='Source and destination overlap in'
 #valgrind_output_dir=$(abs_top_srcdir)/tests/
 #valgrind_output_dir=$(abs_top_srcdir)/tests/dir/
 #valgrind_output_dir=$(abs_top_srcdir)/valgrind-results/
+#valgrind_output_dir=$(abs_top_srcdir)/tests/testsuite.dir/
 # work
-valgrind_output_dir=$(abs_top_srcdir)/tests/testsuite.dir/
+valgrind_output_dir=$(abs_top_srcdir)/tests/testsuite.dir/*/valgrind*
 
 #VALGRIND = valgrind --log-file=$(valgrind_output_dir)valgrind.%p --leak-check=full --errors-for-leak-kinds=definite
-VALGRIND = valgrind --log-file=$(valgrind_output_dir)/valgrind.%p --leak-check=full \
+VALGRIND = valgrind --log-file=valgrind.%p --leak-check=full \
  --suppressions=$(abs_top_srcdir)/tests/glibc.supp \
  --suppressions=$(abs_top_srcdir)/tests/openssl.supp --num-callers=20 
 EXTRA_DIST += tests/glibc.supp tests/openssl.supp
 check-valgrind: all tests/atconfig tests/atlocal $(TESTSUITE) \
                 $(valgrind_wrappers) $(check_DATA)
-	mkdir -p $(valgrind_output_dir)
+	#mkdir -p $(valgrind_output_dir)
 	-$(SHELL) '$(TESTSUITE)' -C tests CHECK_VALGRIND=true VALGRIND='$(VALGRIND)' AUTOTEST_PATH='tests/valgrind:$(AUTOTEST_PATH)' -d $(TESTSUITEFLAGS)
 	@echo
 	@echo '----------------------------------------------------------------------'
