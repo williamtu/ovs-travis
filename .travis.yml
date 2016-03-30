@@ -26,18 +26,18 @@ env:
 script:
   - valgrind --help | grep leak
   - valgrind --help 
-  - mkdir -p a/b/c/d/e.dir/f/g
-  - valgrind --log-file=./a/b/c/d/e.dir/f/g/valgrind.%p --leak-check=full ls 
+  - mkdir -p aaaaaaaaaa/bbbbbbbbbb/ccccc/ddddd/e.dir/fffff/ggggg
+  - valgrind --log-file=./aaaaaaaaaa/bbbbbbbbbb/ccccc/ddddd/e.dir/fffff/ggggg/valgrind.%p --leak-check=full ls 
   - find . -name "valgrind.*"
-  - ls a/b/c/d/e.dir/f/g/
+  - ls aaaaaaaaaa/bbbbbbbbbb/ccccc/ddddd/e.dir/fffff/ggggg/
   - ls valgrind*
   - cat ./valgrind.*
-  - ./boot.sh && ./configure && make
-  - make check-valgrind TESTSUITEFLAGS='1100' 
-  - ls /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/
-  - find . -name "valgrind.*" 
-  - find /home/travis/build/williamtu/ovs-travis/ -name "valgrind.*"
-  - grep -r "definitely lost" tests/testsuite.dir/
+#  - ./boot.sh && ./configure && make
+#  - make check-valgrind TESTSUITEFLAGS='1100' 
+#  - ls /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/
+#  - find . -name "valgrind.*" 
+#  - find /home/travis/build/williamtu/ovs-travis/ -name "valgrind.*"
+#  - grep -r "definitely lost" tests/testsuite.dir/
 
 notifications:
   email:
