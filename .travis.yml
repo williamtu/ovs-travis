@@ -26,6 +26,8 @@ env:
 
 
 script:
+  - valgrind --help
+  - valgrind --log-file=valgrind.1 ls
   - ./boot.sh && ./configure && make
   - make check-valgrind TESTSUITEFLAGS='1100' 
   - ls -al /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/
