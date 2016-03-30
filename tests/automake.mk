@@ -212,7 +212,7 @@ valgrind_overlap='Source and destination overlap in'
 #work
 #valgrind_output_dir=$(abs_top_srcdir)/
 #valgrind_output_dir=$(abs_top_srcdir)/tests/
-valgrind_output_dir=$(abs_top_srcdir)/tests/dir/
+#valgrind_output_dir=$(abs_top_srcdir)/tests/dir/
 # ?
 valgrind_output_dir=$(abs_top_srcdir)/tests/testsuite.dir/
 
