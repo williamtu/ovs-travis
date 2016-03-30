@@ -209,9 +209,9 @@ valgrind_invalid_free='(Invalid|Mismatched) free'
 valgrind_uninit_jmp='Conditional jump or move depends on uninitialised value'
 valgrind_uninit_syscall='Syscall param write(buf) points to uninitialised'
 valgrind_overlap='Source and destination overlap in'
-valgrind_output_dir=$(abs_top_srcdir)/valgrind*
+valgrind_output_dir=tests/testsuite.dir/[0-9]*/valgrind*
 
-VALGRIND = valgrind --log-file=$(abs_top_srcdir)/valgrind.1234 --leak-check=full --errors-for-leak-kinds=definite \
+VALGRIND = valgrind --log-file=valgrind.%p --leak-check=full --errors-for-leak-kinds=definite \
 	--suppressions=$(abs_top_srcdir)/tests/glibc.supp \
 	--suppressions=$(abs_top_srcdir)/tests/openssl.supp --num-callers=20
 EXTRA_DIST += tests/glibc.supp tests/openssl.supp
@@ -225,7 +225,8 @@ check-valgrind: all tests/atconfig tests/atlocal $(TESTSUITE) \
 	        sed -n 's/.*ERROR\ SUMMARY:\ \([0-9]*\)\ errors.*/.+\1/p' | bc | tail -1`
 	@echo 'Valgrind output can be found in tests/testsuite.dir/*/valgrind.*'
 	@echo '----------------------------------------------------------------------'
-	@echo -n 'Check definitely memory leak... '
+	ls -al $(valgrind_output_dir)/1100
+	echo -n 'Check definitely memory leak... '
 	if $(EGREP) -r $(valgrind_def_leak) $(valgrind_output_dir) > /dev/null; \
 	then echo 'FAILED'; \
 	else echo 'ok';     \
