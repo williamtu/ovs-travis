@@ -99,6 +99,10 @@ else
 fi
 
 if [ "$TESTSUITE" ] && [ "$CC" != "clang" ]; then
+	if ! make check-valgrind; then
+		exit 1
+	fi
+	exit 1
     if ! make distcheck RECHECK=yes; then
         # testsuite.log is necessary for debugging.
         cat */_build/tests/testsuite.log
