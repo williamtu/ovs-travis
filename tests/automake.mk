@@ -218,9 +218,9 @@ valgrind_output_dir=$(abs_top_srcdir)/valgrind-results/
 
 #VALGRIND = valgrind --log-file=$(valgrind_output_dir)valgrind.%p --leak-check=full --errors-for-leak-kinds=definite
 VALGRIND = valgrind --log-file=$(valgrind_output_dir)/valgrind.%p --leak-check=full \
-	 --suppressions=$(abs_top_srcdir)/tests/glibc.supp \
-     --suppressions=$(abs_top_srcdir)/tests/openssl.supp --num-callers=20
-VALGRIND = valgrind --log-file=valgrind.%p 
+ --suppressions=$(abs_top_srcdir)/tests/glibc.supp \
+ --suppressions=$(abs_top_srcdir)/tests/openssl.supp --num-callers=20 
+#VALGRIND = valgrind --log-file=valgrind.%p 
 EXTRA_DIST += tests/glibc.supp tests/openssl.supp
 check-valgrind: all tests/atconfig tests/atlocal $(TESTSUITE) \
                 $(valgrind_wrappers) $(check_DATA)
