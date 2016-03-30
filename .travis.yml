@@ -24,7 +24,6 @@ env:
 
 
 script:
-  - valgrind --help | grep leak
   - valgrind --help 
   - mkdir -p /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/aaa 
   - valgrind --log-file=/home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/aaa/valgrind.%p --leak-check=full ls 
