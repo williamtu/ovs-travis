@@ -211,13 +211,14 @@ valgrind_uninit_syscall='Syscall param write(buf) points to uninitialised'
 valgrind_overlap='Source and destination overlap in'
 valgrind_output_dir=$(abs_top_srcdir)/valgrind*
 
-VALGRIND = valgrind --log-file=$(abs_top_srcdir)/valgrind.$(RANDOM) --leak-check=full --errors-for-leak-kinds=definite \
+VALGRIND = valgrind --log-file=$(abs_top_srcdir)/valgrind.1234 --leak-check=full --errors-for-leak-kinds=definite \
 	--suppressions=$(abs_top_srcdir)/tests/glibc.supp \
 	--suppressions=$(abs_top_srcdir)/tests/openssl.supp --num-callers=20
 EXTRA_DIST += tests/glibc.supp tests/openssl.supp
 check-valgrind: all tests/atconfig tests/atlocal $(TESTSUITE) \
                 $(valgrind_wrappers) $(check_DATA)
 	-$(SHELL) '$(TESTSUITE)' -C tests CHECK_VALGRIND=true VALGRIND='$(VALGRIND)' AUTOTEST_PATH='tests/valgrind:$(AUTOTEST_PATH)' -d $(TESTSUITEFLAGS)
+	cat $(abs_top_srcdir)/valgrind.1234
 	@echo
 	@echo '----------------------------------------------------------------------'
 	@echo Total errors: `find tests/testsuite.dir -name "valgrind.*" | xargs cat | \
