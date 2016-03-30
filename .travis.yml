@@ -28,14 +28,14 @@ env:
 
 
 script:
-  #- ./boot.sh && ./configure && make
-  - valgrind --log-file=./valgrind.%p ls
+  - valgrind --log-file=./valgrind.%p --leak-check=full --errors-for-leak-kinds=definite ls
   - ls valgrind*
   - cat ./valgrind.*
-  #- make check-valgrind TESTSUITEFLAGS='1100' 
-  #- ls -al /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/
-  #- ls -al /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/1100/
-  #- grep -r "definitely lost" tests/testsuite.dir/
+  - ./boot.sh && ./configure && make
+  - make check-valgrind TESTSUITEFLAGS='1100' 
+  - ls  /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/
+  - ls  /home/travis/build/williamtu/ovs-travis/tests/testsuite.dir/1100/
+  - grep -r "definitely lost" tests/testsuite.dir/
 
 notifications:
   email:
