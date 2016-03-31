@@ -104,7 +104,10 @@ if [ "$TESTSUITE" ] && [ "$CC" != "clang" ]; then
         cat */_build/tests/testsuite.log
         exit 1
     fi
-	if ! make check-valgrind; then
+	# Randomly pick 20 test cases
+	testcases=$(./tests/testsuite --list |  sed -n  "s/\ *\([0-9]*\).*/\1/p" | sort  -R | head -20 | awk '{s=s" "$1}
+	END{print s}')
+	if ! make check-valgrind TESTSUITEFLAGS="$testcases"; then
 		exit 1
 	fi
 fi
