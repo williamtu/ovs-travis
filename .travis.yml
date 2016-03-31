@@ -25,7 +25,7 @@ sudo: false
 
 env:
   - TESTSUITE=1 KERNEL=3.18.1
-  - TESTVALGRIND=1 KERNEL=3.10.96
+  - TESTSUITE=1 TESTVALGRIND=1 KERNEL=3.10.96
 
 matrix:
   include:
