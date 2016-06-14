@@ -60,6 +60,7 @@ struct dp_packet {
                                     * or UINT16_MAX. */
     uint16_t l4_ofs;               /* Transport-level header offset,
                                       or UINT16_MAX. */
+    uint32_t cutlen;               /* length in bytes to cut from the end. */
     union {
         struct pkt_metadata md;
         uint64_t data[DP_PACKET_CONTEXT_SIZE / 8];
@@ -493,6 +494,31 @@ dp_packet_set_allocated(struct dp_packet *b, uint16_t s)
     b->allocated_ = s;
 }
 #endif
+
+static inline void
+dp_packet_reset_cutlen(struct dp_packet *b)
+{
+    b->cutlen = 0;
+}
+
+static inline uint32_t
+dp_packet_set_cutlen(struct dp_packet *b, uint32_t max_len)
+{
+    if (max_len < ETH_HEADER_LEN ||
+        max_len >= dp_packet_size(b)) {
+        b->cutlen = 0;
+    }
+    else {
+        b->cutlen = dp_packet_size(b) - max_len;
+    }
+    return b->cutlen;
+}
+
+static inline uint32_t
+dp_packet_get_cutlen(struct dp_packet *b)
+{
+    return b->cutlen;
+}
 
 static inline void *
 dp_packet_data(const struct dp_packet *b)

@@ -30,6 +30,7 @@ dp_packet_init__(struct dp_packet *b, size_t allocated, enum dp_packet_source so
     dp_packet_reset_offsets(b);
     pkt_metadata_init(&b->md, 0);
     dp_packet_rss_invalidate(b);
+    dp_packet_reset_cutlen(b);
 }
 
 static void

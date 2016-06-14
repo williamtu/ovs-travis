@@ -4057,11 +4057,25 @@ dp_execute_cb(void *aux_, struct dp_packet_batch *packets_,
     case OVS_ACTION_ATTR_TUNNEL_PUSH:
         if (*depth < MAX_RECIRC_DEPTH) {
             struct dp_packet_batch tnl_pkt;
+            struct dp_packet **orig_packets = packets_->packets;
             int err;
 
             if (!may_steal) {
                 dp_packet_batch_clone(&tnl_pkt, packets_);
                 packets_ = &tnl_pkt;
+            }
+
+            for (int i = 0; i < packets_->count; i++) {
+                /* if may_steal, then opacket == packet. */
+                struct dp_packet *orig_packet = orig_packets[i];
+                struct dp_packet *packet = packets_->packets[i];
+                uint32_t cutlen = dp_packet_get_cutlen(orig_packet);
+
+                if (cutlen > 0) {
+                    dp_packet_set_size(packet,
+                            dp_packet_size(packet) - cutlen);
+                    dp_packet_reset_cutlen(orig_packet);
+                }
             }
 
             err = push_tnl_action(pmd, a, packets_);
@@ -4076,6 +4090,7 @@ dp_execute_cb(void *aux_, struct dp_packet_batch *packets_,
 
     case OVS_ACTION_ATTR_TUNNEL_POP:
         if (*depth < MAX_RECIRC_DEPTH) {
+            struct dp_packet **orig_packets = packets_->packets;
             odp_port_t portno = u32_to_odp(nl_attr_get_u32(a));
 
             p = pmd_tx_port_cache_lookup(pmd, portno);
@@ -4084,8 +4099,21 @@ dp_execute_cb(void *aux_, struct dp_packet_batch *packets_,
                 int i;
 
                 if (!may_steal) {
-                   dp_packet_batch_clone(&tnl_pkt, packets_);
-                   packets_ = &tnl_pkt;
+                    dp_packet_batch_clone(&tnl_pkt, packets_);
+                    packets_ = &tnl_pkt;
+                }
+
+                for (int i = 0; i < packets_->count; i++) {
+                    /* if may_steal, then opacket == packet. */
+                    struct dp_packet *orig_packet = orig_packets[i];
+                    struct dp_packet *packet = packets_->packets[i];
+                    uint32_t cutlen = dp_packet_get_cutlen(orig_packet);
+
+                    if (cutlen > 0) {
+                        dp_packet_set_size(packet,
+                                dp_packet_size(packet) - cutlen);
+                        dp_packet_reset_cutlen(orig_packet);
+                    }
                 }
 
                 netdev_pop_header(p->netdev, packets_);
@@ -4170,6 +4198,7 @@ dp_execute_cb(void *aux_, struct dp_packet_batch *packets_,
     case OVS_ACTION_ATTR_SAMPLE:
     case OVS_ACTION_ATTR_HASH:
     case OVS_ACTION_ATTR_UNSPEC:
+    case OVS_ACTION_ATTR_TRUNC:
     case __OVS_ACTION_ATTR_MAX:
         OVS_NOT_REACHED();
     }

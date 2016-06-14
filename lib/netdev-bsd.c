@@ -698,6 +698,11 @@ netdev_bsd_send(struct netdev *netdev_, int qid OVS_UNUSED,
     for (i = 0; i < cnt; i++) {
         const void *data = dp_packet_data(pkts[i]);
         size_t size = dp_packet_size(pkts[i]);
+        uint32_t cutlen = dp_packet_get_cutlen(pkts[i]);
+
+        if (cutlen > 0) {
+            size -= cutlen;
+        }
 
         while (!error) {
             ssize_t retval;

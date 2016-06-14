@@ -1169,6 +1169,11 @@ netdev_linux_send(struct netdev *netdev_, int qid OVS_UNUSED,
         const void *data = dp_packet_data(pkts[i]);
         size_t size = dp_packet_size(pkts[i]);
         ssize_t retval;
+        uint32_t cutlen = dp_packet_get_cutlen(pkts[i]);
+
+        if (cutlen > 0) {
+            size -= cutlen;
+        }
 
         if (!is_tap_netdev(netdev_)) {
             /* Use our AF_PACKET socket to send to this device. */
