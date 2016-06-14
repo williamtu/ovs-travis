@@ -1585,6 +1585,12 @@ netdev_dpdk_send__(struct netdev_dpdk *dev, int qid,
 
         for (i = 0; i < cnt; i++) {
             int size = dp_packet_size(pkts[i]);
+            uint32_t cutlen = dp_packet_get_cutlen(pkts[i]);
+
+            if (cutlen > 0) {
+                size -= cutlen;
+                dp_packet_set_size(pkts[i], size);
+            }
 
             if (OVS_UNLIKELY(size > dev->max_packet_len)) {
                 if (next_tx_idx != i) {
