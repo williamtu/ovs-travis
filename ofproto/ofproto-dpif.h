@@ -90,9 +90,6 @@ struct dpif_backer_support {
     /* True if the datapath supports OVS_FLOW_ATTR_UFID. */
     bool ufid;
 
-    /* True if the datapath supports OVS_ACTION_ATTR_TRUNC action. */
-    bool trunc;
-
     /* Each member represents support for related OVS_KEY_ATTR_* fields. */
     struct odp_support odp;
 };
