@@ -555,7 +555,7 @@ parse_truncate_subfield(struct ofpact_output_trunc *output_trunc,
                 return xasprintf("output to unknown truncate port: %s",
                                   value);
             }
-            if (ofp_to_u16(output_trunc->port) > ofp_to_u16(OFPP_MAX)) {
+            if (output_trunc->port > ofp_to_u16(OFPP_MAX)) {
                 if (output_trunc->port != OFPP_LOCAL &&
                     output_trunc->port != OFPP_IN_PORT)
                 return xasprintf("output to unsupported truncate port: %s",
