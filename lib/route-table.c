@@ -316,6 +316,7 @@ route_table_fallback_lookup(const struct in6_addr *ip6_dst OVS_UNUSED,
 static void
 name_table_init(void)
 {
+    free(name_notifier);
     name_notifier = rtnetlink_notifier_create(name_table_change, NULL);
 }
 
