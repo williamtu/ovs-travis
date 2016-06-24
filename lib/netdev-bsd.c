@@ -618,12 +618,13 @@ netdev_rxq_bsd_recv_tap(struct netdev_rxq_bsd *rxq, struct dp_packet *buffer)
 }
 
 static int
-netdev_bsd_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet **packets,
-                    int *c)
+netdev_bsd_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch)
 {
     struct netdev_rxq_bsd *rxq = netdev_rxq_bsd_cast(rxq_);
     struct netdev *netdev = rxq->up.netdev;
     struct dp_packet *packet;
+    struct dp_packet **packets = batch->packets;
+    int *c = &batch->count;
     ssize_t retval;
     int mtu;
 
@@ -681,10 +682,12 @@ netdev_bsd_rxq_drain(struct netdev_rxq *rxq_)
  */
 static int
 netdev_bsd_send(struct netdev *netdev_, int qid OVS_UNUSED,
-                struct dp_packet **pkts, int cnt, bool may_steal)
+                struct dp_packet_batch *batch, bool may_steal)
 {
     struct netdev_bsd *dev = netdev_bsd_cast(netdev_);
     const char *name = netdev_get_name(netdev_);
+    int cnt = batch->count;
+    struct dp_packet **okts = batch->packets;
     int error;
     int i;
 

@@ -1089,12 +1089,13 @@ netdev_linux_rxq_recv_tap(int fd, struct dp_packet *buffer)
 }
 
 static int
-netdev_linux_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet **packets,
-                      int *c)
+netdev_linux_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch)
 {
     struct netdev_rxq_linux *rx = netdev_rxq_linux_cast(rxq_);
     struct netdev *netdev = rx->up.netdev;
     struct dp_packet *buffer;
+    struct dp_packet **packets = batch->packets;
+    int *c = &batch->count;
     ssize_t retval;
     int mtu;
 
@@ -1159,10 +1160,12 @@ netdev_linux_rxq_drain(struct netdev_rxq *rxq_)
  * expected to do additional queuing of packets. */
 static int
 netdev_linux_send(struct netdev *netdev_, int qid OVS_UNUSED,
-                  struct dp_packet **pkts, int cnt, bool may_steal)
+                  struct dp_packet_batch *batch, bool may_steal)
 {
     int i;
     int error = 0;
+    int cnt = batch->count;
+    struct dp_packet **pkts = batch->packets;
 
     /* 'i' is incremented only if there's no error */
     for (i = 0; i < cnt;) {

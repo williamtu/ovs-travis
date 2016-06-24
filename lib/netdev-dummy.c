@@ -951,12 +951,13 @@ netdev_dummy_rxq_dealloc(struct netdev_rxq *rxq_)
 }
 
 static int
-netdev_dummy_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet **arr,
-                      int *c)
+netdev_dummy_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch)
 {
     struct netdev_rxq_dummy *rx = netdev_rxq_dummy_cast(rxq_);
     struct netdev_dummy *netdev = netdev_dummy_cast(rx->up.netdev);
     struct dp_packet *packet;
+    struct dp_packet **arr = batch->packets;
+    int *c = &batch->count;
 
     ovs_mutex_lock(&netdev->mutex);
     if (!ovs_list_is_empty(&rx->recv_queue)) {
@@ -1034,10 +1035,12 @@ netdev_dummy_rxq_drain(struct netdev_rxq *rxq_)
 
 static int
 netdev_dummy_send(struct netdev *netdev, int qid OVS_UNUSED,
-                  struct dp_packet **pkts, int cnt, bool may_steal)
+                  struct dp_packet_batch *batch, bool may_steal)
 {
     struct netdev_dummy *dev = netdev_dummy_cast(netdev);
     int error = 0;
+    int cnt = batch->count;
+    struct dp_packet **pkts = batch->packets;
     int i;
 
     for (i = 0; i < cnt; i++) {
