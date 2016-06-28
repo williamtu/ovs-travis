@@ -1036,7 +1036,7 @@ packet_set_ipv6(struct dp_packet *packet, const ovs_be32 src[4],
 static void
 packet_set_port(ovs_be16 *port, ovs_be16 new_port, ovs_be16 *csum)
 {
-    if (*port != new_port) {
+    if (port && *port != new_port) {
         *csum = recalc_csum16(*csum, *port, new_port);
         *port = new_port;
     }
