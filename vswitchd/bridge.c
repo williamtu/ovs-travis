@@ -1999,7 +1999,7 @@ find_local_hw_addr(const struct bridge *br, struct eth_addr *ea,
 
             /* The local port doesn't count (since we're trying to choose its
              * MAC address anyway). */
-            if (iface->ofp_port == OFPP_LOCAL) {
+            if (iface && iface->ofp_port == OFPP_LOCAL) {
                 continue;
             }
 
