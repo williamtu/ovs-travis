@@ -1805,7 +1805,6 @@ nbctl_lr_route_list(struct ctl_context *ctx)
                 VLOG_WARN("router "UUID_FMT" (%s) has invalid prefix: %s",
                           UUID_ARGS(&lr->header_.uuid), lr->name,
                           route->ip_prefix);
-                free(error);
                 continue;
             }
         }
