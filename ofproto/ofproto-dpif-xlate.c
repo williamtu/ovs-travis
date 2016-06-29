@@ -2604,7 +2604,8 @@ xlate_normal(struct xlate_ctx *ctx)
 
 /* Appends a "sample" action for sFlow or IPFIX to 'ctx->odp_actions'.  The
  * 'probability' is the number of packets out of UINT32_MAX to sample.  The
- * 'cookie' (of length 'cookie_size' bytes) is passed back in the callback for
+ * 'snaplen' is the maximum sampled packet size in bytes.  The 'cookie'
+ * (of length 'cookie_size' bytes) is passed back in the callback for
  * each sampled packet.  'tunnel_out_port', if not ODPP_NONE, is added as the
  * OVS_USERSPACE_ATTR_EGRESS_TUN_PORT attribute.  If 'include_actions', an
  * OVS_USERSPACE_ATTR_ACTIONS attribute is added.  If 'emit_set_tunnel',
@@ -2615,6 +2616,7 @@ xlate_normal(struct xlate_ctx *ctx)
 static size_t
 compose_sample_action(struct xlate_ctx *ctx,
                       const uint32_t probability,
+                      const uint16_t snaplen,
                       const union user_action_cookie *cookie,
                       const size_t cookie_size,
                       const odp_port_t tunnel_out_port,
@@ -2627,6 +2629,21 @@ compose_sample_action(struct xlate_ctx *ctx,
 
     size_t actions_offset = nl_msg_start_nested(ctx->odp_actions,
                                                 OVS_SAMPLE_ATTR_ACTIONS);
+
+    if (ctx->xbridge->support.trunc) {
+        if (snaplen >= ETH_HEADER_LEN && snaplen < UINT16_MAX) {
+            struct ovs_action_trunc *trunc;
+
+            trunc = nl_msg_put_unspec_uninit(ctx->odp_actions,
+                            OVS_ACTION_ATTR_TRUNC,
+                            sizeof *trunc);
+            trunc->max_len = snaplen;
+        } else if (snaplen != 0 && snaplen < ETH_HEADER_LEN) {
+            static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+
+            VLOG_WARN_RL(&rl, "invalid snaplen: %"PRIu16, snaplen);
+        }
+    }
 
     odp_port_t odp_port = ofp_port_to_odp_port(
         ctx->xbridge, ctx->xin->flow.in_port.ofp_port);
@@ -2660,6 +2677,7 @@ compose_sflow_action(struct xlate_ctx *ctx)
 
     union user_action_cookie cookie = { .type = USER_ACTION_COOKIE_SFLOW };
     return compose_sample_action(ctx, dpif_sflow_get_probability(sflow),
+                                 dpif_sflow_get_header_len(sflow),
                                  &cookie, sizeof cookie.sflow, ODPP_NONE,
                                  true);
 }
@@ -2707,6 +2725,7 @@ compose_ipfix_action(struct xlate_ctx *ctx, odp_port_t output_odp_port)
     };
     compose_sample_action(ctx,
                           dpif_ipfix_get_bridge_exporter_probability(ipfix),
+                          UINT16_MAX,
                           &cookie, sizeof cookie.ipfix, tunnel_out_port,
                           false);
 }
@@ -4236,6 +4255,7 @@ xlate_sample_action(struct xlate_ctx *ctx,
     /* Scale the probability from 16-bit to 32-bit while representing
      * the same percentage. */
     uint32_t probability = (os->probability << 16) | os->probability;
+    uint16_t snaplen = os->snaplen;
 
     if (!ctx->xbridge->support.variable_length_userdata) {
         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 1);
@@ -4302,7 +4322,8 @@ xlate_sample_action(struct xlate_ctx *ctx,
             .output_odp_port = output_odp_port,
         }
     };
-    compose_sample_action(ctx, probability, &cookie, sizeof cookie.flow_sample,
+    compose_sample_action(ctx, probability, snaplen,
+                          &cookie, sizeof cookie.flow_sample,
                           tunnel_out_port, false);
 }
 
