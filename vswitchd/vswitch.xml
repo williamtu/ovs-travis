@@ -3692,15 +3692,6 @@
           VLAN and should generally be preferred.
         </p>
       </column>
-
-      <column name="snaplen">
-        <p>Maximum per mirrored packet size in bytes.</p>
-        <p>A mirrored packet with size larger than <ref column="snaplen"/>
-           will be truncated in datapath to <ref column="snaplen"/> bytes
-           before sending to the mirror output port.  A snaplen of 0 equals
-           65535, which means no truncation applied.
-        </p>
-      </column>
     </group>
 
     <group title="Statistics: Mirror counters">
