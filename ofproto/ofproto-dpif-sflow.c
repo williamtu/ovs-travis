@@ -556,6 +556,16 @@ dpif_sflow_get_probability(const struct dpif_sflow *ds) OVS_EXCLUDED(mutex)
     return probability;
 }
 
+uint16_t
+dpif_sflow_get_header_len(const struct dpif_sflow *ds) OVS_EXCLUDED(mutex)
+{
+    uint16_t header_len;
+    ovs_mutex_lock(&mutex);
+    header_len = ds->options->header_len;
+    ovs_mutex_unlock(&mutex);
+    return header_len;
+}
+
 void
 dpif_sflow_unref(struct dpif_sflow *ds) OVS_EXCLUDED(mutex)
 {
@@ -1223,6 +1233,7 @@ dpif_sflow_cookie_num_outputs(const union user_action_cookie *cookie)
 void
 dpif_sflow_received(struct dpif_sflow *ds, const struct dp_packet *packet,
 		    const struct flow *flow, odp_port_t odp_in_port,
+		    const uint32_t len,
 		    const union user_action_cookie *cookie,
 		    const struct dpif_sflow_actions *sflow_actions)
     OVS_EXCLUDED(mutex)
@@ -1269,11 +1280,10 @@ dpif_sflow_received(struct dpif_sflow *ds, const struct dp_packet *packet,
     header->header_protocol = SFLHEADER_ETHERNET_ISO8023;
     /* The frame_length should include the Ethernet FCS (4 bytes),
      * but it has already been stripped,  so we need to add 4 here. */
-    header->frame_length = dp_packet_size(packet) + 4;
+    header->frame_length = len + 4;
     /* Ethernet FCS stripped off. */
     header->stripped = 4;
-    header->header_length = MIN(dp_packet_size(packet),
-                                sampler->sFlowFsMaximumHeaderSize);
+    header->header_length = MIN(len, sampler->sFlowFsMaximumHeaderSize);
     header->header_bytes = dp_packet_data(packet);
 
     /* Add extended switch element. */
