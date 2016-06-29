@@ -4756,7 +4756,8 @@ struct nx_action_sample2 {
     ovs_be32 obs_domain_id;         /* ID of sampling observation domain. */
     ovs_be32 obs_point_id;          /* ID of sampling observation point. */
     ovs_be16 sampling_port;         /* Sampling port. */
-    uint8_t  pad[6];                /* Pad to a multiple of 8 bytes */
+    ovs_be16 snaplen;               /* Max sampled packet size in byte. */
+    uint8_t  pad[4];                /* Pad to a multiple of 8 bytes */
  };
  OFP_ASSERT(sizeof(struct nx_action_sample2) == 32);
 
@@ -4775,6 +4776,7 @@ decode_NXAST_RAW_SAMPLE(const struct nx_action_sample *nas,
     sample->obs_point_id = ntohl(nas->obs_point_id);
     /* Default value for sampling port is OFPP_NONE */
     sample->sampling_port = OFPP_NONE;
+    sample->snaplen = UINT16_MAX;
 
     if (sample->probability == 0) {
         return OFPERR_OFPBAC_BAD_ARGUMENT;
@@ -4797,6 +4799,7 @@ decode_NXAST_RAW_SAMPLE2(const struct nx_action_sample2 *nas,
     sample->obs_domain_id = ntohl(nas->obs_domain_id);
     sample->obs_point_id = ntohl(nas->obs_point_id);
     sample->sampling_port = u16_to_ofp(ntohs(nas->sampling_port));
+    sample->snaplen = ntohs(nas->snaplen);
 
     if (sample->probability == 0) {
         return OFPERR_OFPBAC_BAD_ARGUMENT;
@@ -4810,9 +4813,11 @@ encode_SAMPLE(const struct ofpact_sample *sample,
               enum ofp_version ofp_version OVS_UNUSED, struct ofpbuf *out)
 {
     if (sample->ofpact.raw == NXAST_RAW_SAMPLE2
-        || sample->sampling_port != OFPP_NONE) {
+        || sample->sampling_port != OFPP_NONE
+        || sample->snaplen != UINT16_MAX) {
         struct nx_action_sample2 *nas = put_NXAST_SAMPLE2(out);
         nas->probability = htons(sample->probability);
+        nas->snaplen = htons(sample->snaplen);
         nas->collector_set_id = htonl(sample->collector_set_id);
         nas->obs_domain_id = htonl(sample->obs_domain_id);
         nas->obs_point_id = htonl(sample->obs_point_id);
@@ -4837,6 +4842,7 @@ parse_SAMPLE(char *arg, struct ofpbuf *ofpacts,
 {
     struct ofpact_sample *os = ofpact_put_SAMPLE(ofpacts);
     os->sampling_port = OFPP_NONE;
+    os->snaplen = UINT16_MAX;
 
     char *key, *value;
     while (ofputil_parse_key_value(&arg, &key, &value)) {
@@ -4857,6 +4863,8 @@ parse_SAMPLE(char *arg, struct ofpbuf *ofpacts,
             if (!ofputil_port_from_string(value, &os->sampling_port)) {
                 error = xasprintf("%s: unknown port", value);
             }
+        } else if (!strcmp(key, "snaplen")) {
+            error = str_to_u16(value, "snaplen", &os->snaplen);
         } else {
             error = xasprintf("invalid key \"%s\" in \"sample\" argument",
                               key);
@@ -4884,6 +4892,12 @@ format_SAMPLE(const struct ofpact_sample *a, struct ds *s)
                   colors.param, colors.end, a->collector_set_id,
                   colors.param, colors.end, a->obs_domain_id,
                   colors.param, colors.end, a->obs_point_id);
+
+    if (a->ofpact.raw == NXAST_RAW_SAMPLE2 &&
+        a->snaplen != 0 && a->snaplen != UINT16_MAX) {
+        ds_put_format(s, ",%ssnaplen=%s%"PRIu16,
+                      colors.param, colors.end, a->snaplen);
+    }
     if (a->sampling_port != OFPP_NONE) {
         ds_put_format(s, ",%ssampling_port=%s%"PRIu16,
                       colors.param, colors.end, a->sampling_port);

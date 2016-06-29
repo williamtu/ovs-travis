@@ -56,6 +56,7 @@ struct dpif_sflow *dpif_sflow_ref(const struct dpif_sflow *);
 void dpif_sflow_unref(struct dpif_sflow *);
 
 uint32_t dpif_sflow_get_probability(const struct dpif_sflow *);
+uint16_t dpif_sflow_get_header_len(const struct dpif_sflow *);
 
 void dpif_sflow_set_options(struct dpif_sflow *,
                             const struct ofproto_sflow_options *);
@@ -75,6 +76,7 @@ void dpif_sflow_read_actions(const struct flow *,
 
 void dpif_sflow_received(struct dpif_sflow *, const struct dp_packet *,
                          const struct flow *, odp_port_t odp_port,
+                         const uint32_t cutlen,
                          const union user_action_cookie *,
 			 const struct dpif_sflow_actions *);
 

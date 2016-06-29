@@ -789,6 +789,7 @@ struct ofpact_note {
 struct ofpact_sample {
     struct ofpact ofpact;
     uint16_t probability;  /* Always positive. */
+    uint16_t snaplen;
     uint32_t collector_set_id;
     uint32_t obs_domain_id;
     uint32_t obs_point_id;

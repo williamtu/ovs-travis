@@ -497,6 +497,42 @@ n_bytes=100
 OVS_TRAFFIC_VSWITCHD_STOP
 AT_CLEANUP
 
+AT_SETUP([datapath - truncate and userspace action])
+dnl Demonstrate that when truncate happens at kernel datapath, the
+dnl upcall netlink packet size is no longer the original size.
+OVS_TRAFFIC_VSWITCHD_START()
+
+dnl skip if it is check-userspace
+AT_CHECK([ovs-ofctl add-flow br0 "actions=normal"])
+ADD_NAMESPACES(at_ns0, at_ns1)
+
+ADD_VETH(p0, at_ns0, br0, "10.1.1.1/24")
+ADD_VETH(p1, at_ns1, br0, "10.1.1.2/24")
+
+NS_CHECK_EXEC([at_ns0], [ping -q -c 3 -i 0.3 -w 2 10.1.1.2 | FORMAT_PING], [0], [dnl
+3 packets transmitted, 3 received, 0% packet loss, time 0ms
+])
+
+dnl setup sflow
+AT_CHECK([ovs-vsctl -- \
+    --id=@s create sFlow agent=br0 target=\"127.0.0.1:6344\" \
+    header=64 sampling=1 polling=1 -- set bridge br0 sflow=@s
+], [0], [stdout])
+
+dnl ofproto/trace
+AT_CHECK([ovs-appctl ofproto/trace br0 "in_port=2,dl_src=50:54:00:00:00:05,dl_dst=50:54:00:00:00:07,dl_type=0x0800,nw_src=192.168.0.1,nw_dst=192.168.0.2,nw_proto=6,tp_src=8,tp_dst=9"], [0], [stdout])
+AT_CHECK([tail -1 stdout | sed 's/pid=[[0-9]]*/pid=/g'], [0],
+    [Datapath actions: sample(sample=100.0%,actions(trunc(64),userspace(pid=,sFlow(vid=0,pcp=0,output=2147483650),actions))),1,2
+])
+
+dnl send ping with 1024 bytes, the sFlow sample will truncate it in datapath
+NS_CHECK_EXEC([at_ns0], [ping -s 1024 -q -c 3 -i 0.3 -w 2 10.1.1.2 | FORMAT_PING], [0], [dnl
+3 packets transmitted, 3 received, 0% packet loss, time 0ms
+])
+
+OVS_TRAFFIC_VSWITCHD_STOP
+AT_CLEANUP
+
 AT_SETUP([conntrack - controller])
 CHECK_CONNTRACK()
 OVS_TRAFFIC_VSWITCHD_START()
