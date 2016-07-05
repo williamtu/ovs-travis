@@ -2337,10 +2337,6 @@ port.  When this option is omitted, or specified as \fBNONE\fB, IPFIX
 does not differentiate between ingress packets and egress packets and
 does not export egress tunnel information.  This option was added in
 Open vSwitch 2.5.90.
-.IP "\fBsnaplen=\fIlen\fR"
-Maximum per-packet number of bytes to sample.  The \fIlen\fR should be
-between \fB14\fR and \fB65535\fR.  This option was added in Open vSwitch
-2.5.90.  Defaults to 65535.
 .RE
 .IP
 Refer to \fBovs\-vswitchd.conf.db\fR(5) for more details on
