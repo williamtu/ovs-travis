@@ -688,9 +688,9 @@ int rpl_ipgre_init(void)
 		goto add_proto_failed;
 	}
 
-	err = rtnl_link_register(&ipgre_tap_ops);
-	if (err < 0)
-		goto tap_ops_failed;
+//	err = rtnl_link_register(&ipgre_tap_ops);
+//	if (err < 0)
+//		goto tap_ops_failed;
 
 	pr_info("GRE over IPv4 tunneling driver\n");
 	return -EINVAL;
