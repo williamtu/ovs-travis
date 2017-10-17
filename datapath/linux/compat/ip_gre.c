@@ -693,6 +693,7 @@ int rpl_ipgre_init(void)
 		goto tap_ops_failed;
 
 	pr_info("GRE over IPv4 tunneling driver\n");
+	return -EINVAL;
 	return 0;
 
 tap_ops_failed:
