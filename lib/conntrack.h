@@ -97,6 +97,7 @@ int conntrack_execute(struct conntrack *, struct dp_packet_batch *,
                       const char *helper,
                       const struct nat_action_info_t *nat_action_info,
                       long long now);
+int conntrack_clear(struct dp_packet *packet);
 
 struct conntrack_dump {
     struct conntrack *ct;
