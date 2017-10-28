@@ -262,6 +262,7 @@ parse_options(int argc, char *argv[])
 
         switch (c) {
         case 't':
+            ovs_assert(optarg);
             timeout = strtoul(optarg, NULL, 10);
             if (timeout <= 0) {
                 ovs_fatal(0, "value %s on -t or --timeout is not at least 1",
