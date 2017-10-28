@@ -275,6 +275,7 @@ process_start(char **argv, struct process **pp)
             close(fd);
         }
         xpthread_sigmask(SIG_SETMASK, &prev_mask, NULL);
+        ovs_assert(argv[0]);
         execvp(argv[0], argv);
         fprintf(stderr, "execvp(\"%s\") failed: %s\n",
                 argv[0], ovs_strerror(errno));
