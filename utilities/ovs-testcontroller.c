@@ -318,6 +318,7 @@ parse_options(int argc, char *argv[])
             if (!strcmp(optarg, "permanent")) {
                 max_idle = OFP_FLOW_PERMANENT;
             } else {
+                ovs_assert(optarg);
                 max_idle = atoi(optarg);
                 if (max_idle < 1 || max_idle > 65535) {
                     ovs_fatal(0, "--max-idle argument must be between 1 and "
@@ -327,6 +328,7 @@ parse_options(int argc, char *argv[])
             break;
 
         case 'q':
+            ovs_assert(optarg);
             default_queue = atoi(optarg);
             break;
 
