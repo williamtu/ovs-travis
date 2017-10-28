@@ -172,6 +172,7 @@ process_register(const char *name, pid_t pid)
     struct process *p;
     const char *slash;
 
+    ovs_assert(name);
     p = xzalloc(sizeof *p);
     p->pid = pid;
     slash = strrchr(name, '/');
