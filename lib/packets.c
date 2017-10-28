@@ -1191,6 +1191,7 @@ packet_set_ipv6(struct dp_packet *packet, const struct in6_addr *src,
 
     rh_present = packet_rh_present(packet, &proto);
 
+    ovs_assert(&nh->ip6_src);
     if (memcmp(&nh->ip6_src, src, sizeof(ovs_be32[4]))) {
         packet_set_ipv6_addr(packet, proto, nh->ip6_src.be32, src, true);
     }
