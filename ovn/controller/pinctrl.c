@@ -270,6 +270,7 @@ pinctrl_handle_put_dhcp_opts(
         sizeof (struct dhcp_header);
 
     ovs_be32 magic_cookie = htonl(DHCP_MAGIC_COOKIE);
+    ovs_assert(in_dhcp_opt);
     if (memcmp(in_dhcp_opt, &magic_cookie, sizeof(ovs_be32))) {
         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
         VLOG_WARN_RL(&rl, "DHCP magic cookie not present in the DHCP packet");
