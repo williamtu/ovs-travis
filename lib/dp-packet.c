@@ -222,6 +222,7 @@ dp_packet_copy__(struct dp_packet *b, uint8_t *new_base,
     size_t copy_headroom = MIN(old_headroom, new_headroom);
     size_t copy_tailroom = MIN(old_tailroom, new_tailroom);
 
+    ovs_assert(old_base);
     memcpy(&new_base[new_headroom - copy_headroom],
            &old_base[old_headroom - copy_headroom],
            copy_headroom + dp_packet_size(b) + copy_tailroom);
