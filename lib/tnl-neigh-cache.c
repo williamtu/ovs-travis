@@ -178,6 +178,9 @@ tnl_nd_snoop(const struct flow *flow, struct flow_wildcards *wc,
         return EINVAL;
     }
 
+    if (OVS_UNLIKELY(!wc))
+        return EINVAL;
+
     memset(&wc->masks.ipv6_src, 0xff, sizeof wc->masks.ipv6_src);
     memset(&wc->masks.ipv6_dst, 0xff, sizeof wc->masks.ipv6_dst);
     memset(&wc->masks.nd_target, 0xff, sizeof wc->masks.nd_target);
