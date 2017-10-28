@@ -165,6 +165,7 @@ parse_command_line(int argc, char *argv[])
             exit(EXIT_SUCCESS);
 
         case 'T':
+            ovs_assert(optarg);
             time_alarm(atoi(optarg));
             break;
 
