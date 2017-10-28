@@ -397,6 +397,7 @@ pop_mpls(struct dp_packet *packet, ovs_be16 ethtype)
             dp_packet_set_l2_5(packet, NULL);
         }
         /* Shift the l2 header forward. */
+        ovs_assert(dp_packet_data(packet));
         memmove((char*)dp_packet_data(packet) + MPLS_HLEN, dp_packet_data(packet), len);
         dp_packet_resize_l2_5(packet, -MPLS_HLEN);
     }
