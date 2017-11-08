@@ -21,7 +21,8 @@ before_install: ./.travis/${TRAVIS_OS_NAME}-prepare.sh
 
 before_script: export PATH=$PATH:$HOME/bin
 
-sudo: false
+dist: trusty
+sudo: required 
 
 env:
   - OPTS="--disable-ssl"
