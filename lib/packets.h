@@ -1246,6 +1246,27 @@ struct gre_base_hdr {
 #define GRE_FLAGS       0x00F8
 #define GRE_VERSION     0x0007
 
+/* ERSPAN protocol header */
+struct erspan_md2 {
+    ovs_be32 timestamp;
+    ovs_be16 sgt;
+	uint8_t hwid_upper:2,
+            ft:5,
+            p:1;
+    uint8_t o:1,
+            gra:2,
+            dir:1,
+            hwid:4;
+};
+
+struct erspan_metadata {
+	int version;
+	union {
+		ovs_be32 index;			/* Version 1 (type II)*/
+		struct erspan_md2 md2;	/* Version 2 (type III) */
+	} u;
+};
+
 /* VXLAN protocol header */
 struct vxlanhdr {
     union {

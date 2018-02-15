@@ -1042,6 +1042,18 @@ flow_get_metadata(const struct flow *flow, struct match *flow_metadata)
     if (flow->tunnel.gbp_flags) {
         match_set_tun_gbp_flags(flow_metadata, flow->tunnel.gbp_flags);
     }
+    if (flow->tunnel.erspan_ver) {
+        match_set_tun_erspan_ver(flow_metadata, flow->tunnel.erspan_ver);
+    }
+    if (flow->tunnel.erspan_idx) {
+        match_set_tun_erspan_idx(flow_metadata, flow->tunnel.erspan_idx);
+    }
+    if (flow->tunnel.erspan_dir) {
+        match_set_tun_erspan_dir(flow_metadata, flow->tunnel.erspan_dir);
+    }
+    if (flow->tunnel.erspan_hwid) {
+        match_set_tun_erspan_hwid(flow_metadata, flow->tunnel.erspan_hwid);
+    }
     tun_metadata_get_fmd(&flow->tunnel, flow_metadata);
     if (flow->metadata != htonll(0)) {
         match_set_metadata(flow_metadata, flow->metadata);
@@ -1598,6 +1610,10 @@ flow_wildcards_init_for_packet(struct flow_wildcards *wc,
         WC_MASK_FIELD(wc, tunnel.tp_dst);
         WC_MASK_FIELD(wc, tunnel.gbp_id);
         WC_MASK_FIELD(wc, tunnel.gbp_flags);
+        //WC_MASK_FIELD(wc, tunnel.erspan_ver);
+        WC_MASK_FIELD(wc, tunnel.erspan_idx);
+        //WC_MASK_FIELD(wc, tunnel.erspan_dir);
+        //WC_MASK_FIELD(wc, tunnel.erspan_hwid);
 
         if (!(flow->tunnel.flags & FLOW_TNL_F_UDPIF)) {
             if (flow->tunnel.metadata.present.map) {

@@ -39,7 +39,10 @@ struct flow_tnl {
     ovs_be16 tp_dst;
     ovs_be16 gbp_id;
     uint8_t  gbp_flags;
-    uint8_t  pad1[5];        /* Pad to 64 bits. */
+    uint32_t erspan_idx;
+    uint8_t erspan_ver:2,
+            erspan_dir:1,
+            erspan_hwid:5; //FIXME
     struct tun_metadata metadata;
 };
 

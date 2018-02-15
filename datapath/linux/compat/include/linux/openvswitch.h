@@ -236,6 +236,7 @@ enum ovs_vport_type {
 	OVS_VPORT_TYPE_GRE,      /* GRE tunnel. */
 	OVS_VPORT_TYPE_VXLAN,	 /* VXLAN tunnel. */
 	OVS_VPORT_TYPE_GENEVE,	 /* Geneve tunnel. */
+	OVS_VPORT_TYPE_ERSPAN,	 /* ERSPAN tunnel. */
 	OVS_VPORT_TYPE_LISP = 105,  /* LISP tunnel */
 	OVS_VPORT_TYPE_STT = 106, /* STT tunnel */
 	__OVS_VPORT_TYPE_MAX
@@ -299,6 +300,17 @@ enum {
 };
 
 #define OVS_VXLAN_EXT_MAX (__OVS_VXLAN_EXT_MAX - 1)
+
+enum {
+	OVS_ERSPAN_OPT_UNSPEC,
+	OVS_ERSPAN_OPT_IDX,     /* u32 index */
+	OVS_ERSPAN_OPT_VER,     /* u8 version number */
+	OVS_ERSPAN_OPT_DIR,     /* u8 direction */
+	OVS_ERSPAN_OPT_HWID,    /* u8 hardware ID */
+	__OVS_ERSPAN_OPT_MAX,
+};
+
+#define OVS_ERSPAN_OPT_MAX (__OVS_ERSPAN_OPT_MAX - 1)
 
 /* OVS_VPORT_ATTR_OPTIONS attributes for tunnels.
  */
@@ -395,6 +407,7 @@ enum ovs_tunnel_key_attr {
 	OVS_TUNNEL_KEY_ATTR_IPV6_SRC,		/* struct in6_addr src IPv6 address. */
 	OVS_TUNNEL_KEY_ATTR_IPV6_DST,		/* struct in6_addr dst IPv6 address. */
 	OVS_TUNNEL_KEY_ATTR_PAD,
+	OVS_TUNNEL_KEY_ATTR_ERSPAN_OPTS,	/* struct erspan_metadata. */
 	__OVS_TUNNEL_KEY_ATTR_MAX
 };
 

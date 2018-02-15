@@ -2375,6 +2375,7 @@ static const struct attr_len_tbl ovs_tun_key_attr_lens[OVS_TUNNEL_KEY_ATTR_MAX +
                                             .next_max = OVS_VXLAN_EXT_MAX},
     [OVS_TUNNEL_KEY_ATTR_IPV6_SRC]      = { .len = 16 },
     [OVS_TUNNEL_KEY_ATTR_IPV6_DST]      = { .len = 16 },
+    [OVS_TUNNEL_KEY_ATTR_ERSPAN_OPTS]   = { .len = ATTR_LEN_VARIABLE },
 };
 
 const struct attr_len_tbl ovs_flow_key_attr_lens[OVS_KEY_ATTR_MAX + 1] = {
@@ -2698,6 +2699,23 @@ odp_tun_key_from_attr__(const struct nlattr *attr, bool is_mask,
         case OVS_TUNNEL_KEY_ATTR_GENEVE_OPTS:
             tun_metadata_from_geneve_nlattr(a, is_mask, tun);
             break;
+        case OVS_TUNNEL_KEY_ATTR_ERSPAN_OPTS: {
+            int attr_len = nl_attr_get_size(a);
+            struct erspan_metadata opts;
+
+            memcpy(&opts, nl_attr_get(attr), attr_len);
+
+            tun->erspan_ver = opts.version;
+            if (tun->erspan_ver == 1) {
+                tun->erspan_idx = ntohl(opts.u.index);
+            } else if (tun->erspan_ver == 2) {
+                tun->erspan_dir = opts.u.md2.dir;
+                tun->erspan_hwid = opts.u.md2.hwid; //FIXME
+            } else {
+                VLOG_WARN("%s invalid erspan version\n", __func__);
+            }
+            break;
+		}
 
         default:
             /* Allow this to show up as unexpected, if there are unknown
@@ -2776,6 +2794,24 @@ tun_key_to_attr(struct ofpbuf *a, const struct flow_tnl *tun_key,
         nl_msg_end_nested(a, vxlan_opts_ofs);
     }
     tun_metadata_to_geneve_nlattr(tun_key, tun_flow_key, key_buf, a);
+    if (tun_key->erspan_ver || tun_key->erspan_dir || tun_key->erspan_hwid) { //FIXME
+        VLOG_WARN("%s add erspan index/ver/dir/hwid %x/%x/%x/%x", __func__,
+            tun_key->erspan_idx, tun_key->erspan_ver, tun_key->erspan_dir, tun_key->erspan_hwid);
+
+        size_t erspan_opts_ofs;
+        struct erspan_metadata opts;
+
+        opts.version = tun_key->erspan_ver;
+        if (opts.version == 1) {
+            opts.u.index = htonl(tun_key->erspan_idx);
+        } else {
+            opts.u.md2.dir = tun_key->erspan_dir;
+            opts.u.md2.hwid = tun_key->erspan_hwid; //FIXME
+        }
+
+        nl_msg_put_unspec(a, OVS_TUNNEL_KEY_ATTR_ERSPAN_OPTS,
+                          &opts, sizeof(opts));
+    }
 
     nl_msg_end_nested(a, tun_key_ofs);
 }
@@ -3232,6 +3268,27 @@ format_odp_tun_vxlan_opt(const struct nlattr *attr,
     ofpbuf_uninit(&ofp);
 }
 
+static void
+format_odp_tun_erspan_opt(const struct nlattr *attr,
+                         const struct nlattr *mask_attr, struct ds *ds,
+                         bool verbose)
+{
+    unsigned int left;
+    struct erspan_metadata *opts;
+
+    opts = (struct erspan_metadata *)nl_attr_get(attr);
+
+    format_u8u(ds, "ver", opts->version, NULL, verbose);
+
+    if (opts->version == 1) {
+        ds_put_format(ds, "idx=%#"PRIx32",", opts->u.index); //FIXME: what's verbose?
+    } else if (opts->version == 2) {
+        format_u8u(ds, "dir", opts->u.md2.dir, NULL, verbose);
+        format_u8x(ds, "hwid", opts->u.md2.hwid, NULL, verbose);
+    }
+    ds_chomp(ds, ',');
+}
+
 #define MASK(PTR, FIELD) PTR ? &PTR->FIELD : NULL
 
 static void
@@ -3478,6 +3535,11 @@ format_odp_tun_attr(const struct nlattr *attr, const struct nlattr *mask_attr,
             ds_put_cstr(ds, "),");
             break;
         case OVS_TUNNEL_KEY_ATTR_PAD:
+            break;
+        case OVS_TUNNEL_KEY_ATTR_ERSPAN_OPTS:
+            ds_put_cstr(ds, "erspan(");
+            format_odp_tun_erspan_opt(a, ma, ds, verbose);
+            ds_put_cstr(ds, "),");
             break;
         case __OVS_TUNNEL_KEY_ATTR_MAX:
         default:
@@ -5134,6 +5196,12 @@ parse_odp_key_mask_attr(const char *s, const struct simap *port_names,
         SCAN_FIELD_NESTED("ttl=", uint8_t, u8, OVS_TUNNEL_KEY_ATTR_TTL);
         SCAN_FIELD_NESTED("tp_src=", ovs_be16, be16, OVS_TUNNEL_KEY_ATTR_TP_SRC);
         SCAN_FIELD_NESTED("tp_dst=", ovs_be16, be16, OVS_TUNNEL_KEY_ATTR_TP_DST);
+		SCAN_BEGIN_NESTED("erspan(", OVS_TUNNEL_KEY_ATTR_ERSPAN_OPTS) {
+			SCAN_FIELD_NESTED("ver=", uint8_t, u8, OVS_ERSPAN_OPT_VER);
+			SCAN_FIELD_NESTED("idx=", uint32_t, u32, OVS_ERSPAN_OPT_IDX);
+			SCAN_FIELD_NESTED("dir=", uint8_t, u8, OVS_ERSPAN_OPT_DIR);
+			SCAN_FIELD_NESTED("hwid=", uint8_t, u8, OVS_ERSPAN_OPT_HWID);
+		} SCAN_END_NESTED();
         SCAN_FIELD_NESTED_FUNC("vxlan(gbp(", uint32_t, vxlan_gbp, vxlan_gbp_to_attr);
         SCAN_FIELD_NESTED_FUNC("geneve(", struct geneve_scan, geneve,
                                geneve_to_attr);

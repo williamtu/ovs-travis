@@ -1715,6 +1715,33 @@ ovs-ofctl add-flow br-int 'in_port=3,tun_src=192.168.1.1,tun_id=5001 actions=1'
       </dl>
     </field>
 
+    <h2>ERSPAN Fields</h2>
+    <field id="MFF_TUN_ERSPAN_VER" title="ERSPAN version">
+      <p>
+        ERSPAN version: 1 for version 1 (type II)
+        or 2 for version 2 (type III).
+      </p>
+    </field>
+    <field id="MFF_TUN_ERSPAN_IDX" title="ERSPAN index">
+      <p>
+        ERSPAN index is a 20-bit index/port number associated with the ERSPAN
+        traffic's source port and direction (ingress/egress).  This field is
+        platform dependent.
+      </p>
+    </field>
+    <field id="MFF_TUN_ERSPAN_DIR" title="ERSPAN direction">
+      <p>
+        Specifies the ERSPAN v2 mirrored traffic's direction.
+        1 for egress traffic, and 0 for ingress traffic.
+      </p>
+    </field>
+    <field id="MFF_TUN_ERSPAN_HWID" title="ERSPAN hwid">
+      <p>
+        ERSPAN hardware ID is a 6-bit unique identifier of an
+        ERSPAN v2 engine within a system.
+      </p>
+    </field>
+
     <h2>Geneve Fields</h2>
 
     <p>
