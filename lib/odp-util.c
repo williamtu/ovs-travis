@@ -2795,8 +2795,8 @@ tun_key_to_attr(struct ofpbuf *a, const struct flow_tnl *tun_key,
     }
     tun_metadata_to_geneve_nlattr(tun_key, tun_flow_key, key_buf, a);
     if (tun_key->erspan_ver || tun_key->erspan_dir || tun_key->erspan_hwid) { //FIXME
-        VLOG_WARN("%s add erspan index/ver/dir/hwid %x/%x/%x/%x", __func__,
-            tun_key->erspan_idx, tun_key->erspan_ver, tun_key->erspan_dir, tun_key->erspan_hwid);
+        //VLOG_WARN("%s add erspan index/ver/dir/hwid %x/%x/%x/%x", __func__,
+        //    tun_key->erspan_idx, tun_key->erspan_ver, tun_key->erspan_dir, tun_key->erspan_hwid);
 
         struct erspan_metadata opts;
 
@@ -4746,10 +4746,8 @@ scan_erspan_metadata(const char *s,
         }
     }
 
-VLOG_WARN("%s ver %d idx %x\n", __func__, ver, idx);
-
-    if (!strncmp(s, "))", 2)) {
-        s += 2;
+    if (!strncmp(s, ")", 1)) {
+        s += 1;
 
         key->version = ver;
         if (key->version == 1) {
