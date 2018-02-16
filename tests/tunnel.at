@@ -506,8 +506,8 @@ AT_CHECK([ovs-appctl dpif/show | tail -n +3], [0], [dnl
 AT_DATA([flows.txt], [dnl
 in_port=1,actions=3
 in_port=2,actions=4
-tun_erspan_ver=1, tun_erspan_idx=0x7, actions=1
-tun_erspan_ver=2, tun_erspan_dir=1, tun_erspan_hwid=0x1/0x1, actions=2
+in_port=3,tun_erspan_ver=1,tun_erspan_idx=0x7,actions=1
+in_port=4,tun_erspan_ver=2,tun_erspan_dir=1,tun_erspan_hwid=0x1/0x1,actions=2
 ])
 AT_CHECK([ovs-ofctl add-flows br0 flows.txt])
 
