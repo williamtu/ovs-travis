@@ -358,6 +358,8 @@ ct_clear
 trunc(100)
 clone(1)
 clone(clone(push_vlan(vid=12,pcp=0),2),1)
+set(tunnel(tun_id=0x1,dst=1.1.1.1,ttl=64,erspan(ver=1,idx=0x7),flags(df|key)))
+set(tunnel(tun_id=0x2,dst=1.1.1.2,ttl=64,erspan(ver=2,dir=1,hwid=0x7),flags(df|key)))
 ])
 AT_CHECK_UNQUOTED([ovstest test-odp parse-actions < actions.txt], [0],
   [`cat actions.txt`

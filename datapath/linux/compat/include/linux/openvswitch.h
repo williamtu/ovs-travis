@@ -301,17 +301,6 @@ enum {
 
 #define OVS_VXLAN_EXT_MAX (__OVS_VXLAN_EXT_MAX - 1)
 
-enum {
-	OVS_ERSPAN_OPT_UNSPEC,
-	OVS_ERSPAN_OPT_IDX,     /* u32 index */
-	OVS_ERSPAN_OPT_VER,     /* u8 version number */
-	OVS_ERSPAN_OPT_DIR,     /* u8 direction */
-	OVS_ERSPAN_OPT_HWID,    /* u8 hardware ID */
-	__OVS_ERSPAN_OPT_MAX,
-};
-
-#define OVS_ERSPAN_OPT_MAX (__OVS_ERSPAN_OPT_MAX - 1)
-
 /* OVS_VPORT_ATTR_OPTIONS attributes for tunnels.
  */
 enum {

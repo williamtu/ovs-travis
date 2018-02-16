@@ -4712,6 +4712,67 @@ scan_vxlan_gbp(const char *s, uint32_t *key, uint32_t *mask)
 }
 
 static int
+scan_erspan_metadata(const char *s,
+                     struct erspan_metadata *key,
+                     struct erspan_metadata *mask)
+{
+    const char *s_base = s;
+    uint32_t idx, idx_mask;
+    uint8_t ver, dir, hwid;
+    uint8_t ver_mask, dir_mask, hwid_mask;
+
+    if (!strncmp(s, "ver=", 4)) {
+        s += 4;
+        s += scan_u8(s, &ver, mask ? &ver_mask : NULL);
+    }
+
+    if (s[0] == ',') {
+        s++;
+    }
+
+    if (ver == 1) {
+        if (!strncmp(s, "idx=", 4)) {
+            s += 4;
+            s += scan_u32(s, &idx, mask ? &idx_mask : NULL); 
+        }
+    } else if (ver == 2) {
+        if (!strncmp(s, "dir=", 4)) {
+            s += 4;
+            s += scan_u8(s, &dir, mask ? &dir_mask : NULL);
+        }
+        if (!strncmp(s, "hwid=", 5)) {
+            s += 5;
+            s += scan_u8(s, &hwid, mask ? &hwid_mask : NULL);
+        }
+    }
+
+VLOG_WARN("%s ver %d idx %x\n", __func__, ver, idx);
+
+    if (!strncmp(s, "))", 2)) {
+        s += 2;
+
+        key->version = ver;
+        if (key->version == 1) {
+            key->u.index = htonl(idx);
+            if (mask) {
+                mask->u.index = htonl(idx_mask);
+            }
+        } else {
+            key->u.md2.hwid = hwid;
+            key->u.md2.dir = dir;
+            if (mask) {
+                mask->u.md2.hwid = hwid_mask;
+                mask->u.md2.dir = dir_mask;
+            }
+        }
+
+        return s - s_base;
+    }
+
+    return 0;
+}
+
+static int
 scan_geneve(const char *s, struct geneve_scan *key, struct geneve_scan *mask)
 {
     const char *s_base = s;
@@ -4844,6 +4905,15 @@ geneve_to_attr(struct ofpbuf *a, const void *data_)
 
     nl_msg_put_unspec(a, OVS_TUNNEL_KEY_ATTR_GENEVE_OPTS, geneve->d,
                       geneve->len);
+}
+
+static void
+erspan_to_attr(struct ofpbuf *a, const void *data_)
+{
+    const struct erspan_metadata *md = data_;
+
+    nl_msg_put_unspec(a, OVS_TUNNEL_KEY_ATTR_ERSPAN_OPTS, md,
+                      sizeof *md);
 }
 
 #define SCAN_PUT_ATTR(BUF, ATTR, DATA, FUNC)                      \
@@ -5215,15 +5285,19 @@ parse_odp_key_mask_attr(const char *s, const struct simap *port_names,
         SCAN_FIELD_NESTED("tp_src=", ovs_be16, be16, OVS_TUNNEL_KEY_ATTR_TP_SRC);
         SCAN_FIELD_NESTED("tp_dst=", ovs_be16, be16, OVS_TUNNEL_KEY_ATTR_TP_DST);
 
+/*
         SCAN_BEGIN_NESTED("erspan(", OVS_TUNNEL_KEY_ATTR_ERSPAN_OPTS) {
             SCAN_FIELD_NESTED("ver=", uint8_t, u8, OVS_ERSPAN_OPT_VER);
             SCAN_FIELD_NESTED("idx=", uint32_t, u32, OVS_ERSPAN_OPT_IDX);
             SCAN_FIELD_NESTED("dir=", uint8_t, u8, OVS_ERSPAN_OPT_DIR);
             SCAN_FIELD_NESTED("hwid=", uint8_t, u8, OVS_ERSPAN_OPT_HWID);
 		} SCAN_END_NESTED();
-
+*/
+        SCAN_FIELD_NESTED_FUNC("erspan(", struct erspan_metadata, erspan_metadata,
+                               erspan_to_attr);
+        // call scan_vxlan_gbp
         SCAN_FIELD_NESTED_FUNC("vxlan(gbp(", uint32_t, vxlan_gbp, vxlan_gbp_to_attr);
-        SCAN_FIELD_NESTED_FUNC("geneve(", struct geneve_scan, geneve,
+        SCAN_FIELD_NESTED_FUNC("geneve(", struct geneve_scan, geneve, // scan_geneve
                                geneve_to_attr);
         SCAN_FIELD_NESTED_FUNC("flags(", uint16_t, tun_flags, tun_flags_to_attr);
     } SCAN_END_NESTED();
