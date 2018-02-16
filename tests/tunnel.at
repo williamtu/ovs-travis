@@ -527,12 +527,15 @@ dnl ERSPAN v1 option match
 AT_CHECK([ovs-appctl ofproto/trace ovs-dummy 'recirc_id(0),tunnel(tun_id=0x1,src=1.1.1.1,dst=2.2.2.2,ttl=64,erspan(ver=1,idx=0x7),flags(df|key)),in_port(1),skb_mark(0),eth(src=50:54:00:00:00:05,dst=50:54:00:00:00:07),eth_type(0x0800),ipv4(frag=no)'], [0], [stdout])
 AT_CHECK([tail -2 stdout], [0],
   [Megaflow: recirc_id=0,eth,ip,tun_id=0x1,tun_src=1.1.1.1,tun_dst=2.2.2.2,tun_tos=0,erspan_ver=1,tun_flags=+df-csum+key,in_port=3,nw_frag=no
-  Datapath actions: drop 
+Datapath actions: 3
 ])
 
 dnl ERSPAN v2 option match
-
-
+AT_CHECK([ovs-appctl ofproto/trace ovs-dummy 'recirc_id(0),tunnel(tun_id=0x1,src=1.1.1.1,dst=2.2.2.2,ttl=64,erspan(ver=2,dir=1,hwid=0x7),flags(df|key)),in_port(1),skb_mark(0),eth(src=50:54:00:00:00:05,dst=50:54:00:00:00:07),eth_type(0x0800),ipv4(frag=no)'], [0], [stdout])
+AT_CHECK([tail -2 stdout], [0],
+  [Megaflow: recirc_id=0,eth,ip,tun_id=0x1,tun_src=1.1.1.1,tun_dst=2.2.2.2,tun_tos=0,erspan_ver=2,tun_flags=+df-csum+key,in_port=3,nw_frag=no
+Datapath actions: 2
+])
 
 OVS_VSWITCHD_STOP
 AT_CLEANUP
