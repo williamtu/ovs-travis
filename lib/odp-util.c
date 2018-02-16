@@ -2710,12 +2710,12 @@ odp_tun_key_from_attr__(const struct nlattr *attr, bool is_mask,
                 tun->erspan_idx = ntohl(opts.u.index);
             } else if (tun->erspan_ver == 2) {
                 tun->erspan_dir = opts.u.md2.dir;
-                tun->erspan_hwid = opts.u.md2.hwid; //FIXME
+                tun->erspan_hwid = get_hwid(&opts.u.md2);
             } else {
                 VLOG_WARN("%s invalid erspan version\n", __func__);
             }
             break;
-		}
+        }
 
         default:
             /* Allow this to show up as unexpected, if there are unknown
@@ -2794,10 +2794,7 @@ tun_key_to_attr(struct ofpbuf *a, const struct flow_tnl *tun_key,
         nl_msg_end_nested(a, vxlan_opts_ofs);
     }
     tun_metadata_to_geneve_nlattr(tun_key, tun_flow_key, key_buf, a);
-    if (tun_key->erspan_ver || tun_key->erspan_dir || tun_key->erspan_hwid) { //FIXME
-        //VLOG_WARN("%s add erspan index/ver/dir/hwid %x/%x/%x/%x", __func__,
-        //    tun_key->erspan_idx, tun_key->erspan_ver, tun_key->erspan_dir, tun_key->erspan_hwid);
-
+    if (tun_key->erspan_ver) {
         struct erspan_metadata opts;
 
         opts.version = tun_key->erspan_ver;
@@ -2805,7 +2802,7 @@ tun_key_to_attr(struct ofpbuf *a, const struct flow_tnl *tun_key,
             opts.u.index = htonl(tun_key->erspan_idx);
         } else {
             opts.u.md2.dir = tun_key->erspan_dir;
-            opts.u.md2.hwid = tun_key->erspan_hwid; //FIXME
+            set_hwid(&opts.u.md2, tun_key->erspan_hwid);
         }
 
         nl_msg_put_unspec(a, OVS_TUNNEL_KEY_ATTR_ERSPAN_OPTS,
@@ -5285,12 +5282,10 @@ parse_odp_key_mask_attr(const char *s, const struct simap *port_names,
         SCAN_FIELD_NESTED("ttl=", uint8_t, u8, OVS_TUNNEL_KEY_ATTR_TTL);
         SCAN_FIELD_NESTED("tp_src=", ovs_be16, be16, OVS_TUNNEL_KEY_ATTR_TP_SRC);
         SCAN_FIELD_NESTED("tp_dst=", ovs_be16, be16, OVS_TUNNEL_KEY_ATTR_TP_DST);
-
         SCAN_FIELD_NESTED_FUNC("erspan(", struct erspan_metadata, erspan_metadata,
                                erspan_to_attr);
-        // call scan_vxlan_gbp
         SCAN_FIELD_NESTED_FUNC("vxlan(gbp(", uint32_t, vxlan_gbp, vxlan_gbp_to_attr);
-        SCAN_FIELD_NESTED_FUNC("geneve(", struct geneve_scan, geneve, // scan_geneve
+        SCAN_FIELD_NESTED_FUNC("geneve(", struct geneve_scan, geneve,
                                geneve_to_attr);
         SCAN_FIELD_NESTED_FUNC("flags(", uint16_t, tun_flags, tun_flags_to_attr);
     } SCAN_END_NESTED();

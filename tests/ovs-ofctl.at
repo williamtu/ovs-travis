@@ -20,14 +20,6 @@ for test_case in \
     'tun_metadata0=0                             NXM,OXM' \
     'tun_metadata0=0/0x1                         NXM,OXM' \
     'tun_metadata0                               NXM,OXM' \
-    'tun_erspan_ver=1                            NXM,OXM' \
-    'tun_erspan_ver=2/0x1                        NXM,OXM' \
-    'tun_erspan_idx=1                            NXM,OXM' \
-    'tun_erspan_idx=1/0x1                        NXM,OXM' \
-    'tun_erspan_dir=1                            NXM,OXM' \
-    'tun_erspan_dir=1/0x1                        NXM,OXM' \
-    'tun_erspan_hwid=2/0x1                       NXM,OXM' \
-    'tun_erspan_hwid=2/0x1                       NXM,OXM' \
     'metadata=0                                  NXM,OXM,OpenFlow11' \
     'metadata=1/1                                NXM,OXM,OpenFlow11' \
     'in_port=1                                   any' \

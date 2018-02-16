@@ -1610,10 +1610,10 @@ flow_wildcards_init_for_packet(struct flow_wildcards *wc,
         WC_MASK_FIELD(wc, tunnel.tp_dst);
         WC_MASK_FIELD(wc, tunnel.gbp_id);
         WC_MASK_FIELD(wc, tunnel.gbp_flags);
-        //WC_MASK_FIELD(wc, tunnel.erspan_ver);
+        WC_MASK_FIELD(wc, tunnel.erspan_ver);
         WC_MASK_FIELD(wc, tunnel.erspan_idx);
-        //WC_MASK_FIELD(wc, tunnel.erspan_dir);
-        //WC_MASK_FIELD(wc, tunnel.erspan_hwid);
+        WC_MASK_FIELD(wc, tunnel.erspan_dir);
+        WC_MASK_FIELD(wc, tunnel.erspan_hwid);
 
         if (!(flow->tunnel.flags & FLOW_TNL_F_UDPIF)) {
             if (flow->tunnel.metadata.present.map) {

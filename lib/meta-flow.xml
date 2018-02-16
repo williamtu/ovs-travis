@@ -1718,8 +1718,8 @@ ovs-ofctl add-flow br-int 'in_port=3,tun_src=192.168.1.1,tun_id=5001 actions=1'
     <h2>ERSPAN Fields</h2>
     <field id="MFF_TUN_ERSPAN_VER" title="ERSPAN version">
       <p>
-        ERSPAN version: 1 for version 1 (type II)
-        or 2 for version 2 (type III).
+        ERSPAN version number. 1 for version I (type II)
+        or 2 for version II (type III).
       </p>
     </field>
     <field id="MFF_TUN_ERSPAN_IDX" title="ERSPAN index">
@@ -1732,7 +1732,7 @@ ovs-ofctl add-flow br-int 'in_port=3,tun_src=192.168.1.1,tun_id=5001 actions=1'
     <field id="MFF_TUN_ERSPAN_DIR" title="ERSPAN direction">
       <p>
         Specifies the ERSPAN v2 mirrored traffic's direction.
-        1 for egress traffic, and 0 for ingress traffic.
+        Value 1 for egress traffic, and value 0 for ingress traffic.
       </p>
     </field>
     <field id="MFF_TUN_ERSPAN_HWID" title="ERSPAN hwid">

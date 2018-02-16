@@ -541,16 +541,12 @@ set_tunnel_config(struct netdev *dev_, const struct smap *args, char **errp)
             tnl_cfg.set_egress_pkt_mark = true;
         } else if (!strcmp(node->key, "erspan_idx")) {
             tnl_cfg.erspan_idx = atoi(node->value);
-           VLOG_WARN("%s erspan index %x\n", __func__, tnl_cfg.erspan_idx);
         } else if (!strcmp(node->key, "erspan_ver")) {
             tnl_cfg.erspan_ver = atoi(node->value);
-           VLOG_WARN("%s erspan ver %x\n", __func__, tnl_cfg.erspan_ver);
         } else if (!strcmp(node->key, "erspan_dir")) {
             tnl_cfg.erspan_dir = atoi(node->value);
-           VLOG_WARN("%s erspan dir %x\n", __func__, tnl_cfg.erspan_dir);
         } else if (!strcmp(node->key, "erspan_hwid")) {
             tnl_cfg.erspan_hwid = atoi(node->value);
-           VLOG_WARN("%s erspan hwid %x\n", __func__, tnl_cfg.erspan_hwid);
         } else {
             ds_put_format(&errors, "%s: unknown %s argument '%s'\n", name,
                           type, node->key);
@@ -739,19 +735,15 @@ get_tunnel_config(const struct netdev *dev, struct smap *args)
     }
 
     if (tnl_cfg.erspan_idx) {
-        VLOG_WARN("%s erspan index %d\n", __func__, tnl_cfg.erspan_idx);
         smap_add_format(args, "erspan_idx", "0x%x", tnl_cfg.erspan_idx);
     }
     if (tnl_cfg.erspan_ver) {
-        VLOG_WARN("%s erspan ver %d\n", __func__, tnl_cfg.erspan_ver);
         smap_add_format(args, "erspan_ver", "0x%x", tnl_cfg.erspan_ver);
     }
     if (tnl_cfg.erspan_dir) {
-        VLOG_WARN("%s erspan dir %d\n", __func__, tnl_cfg.erspan_dir);
         smap_add_format(args, "erspan_dir", "0x%x", tnl_cfg.erspan_dir);
     }
     if (tnl_cfg.erspan_hwid) {
-        VLOG_WARN("%s erspan hwid %d\n", __func__, tnl_cfg.erspan_hwid);
         smap_add_format(args, "erspan_hwid", "0x%x", tnl_cfg.erspan_hwid);
     }
 
@@ -1009,7 +1001,7 @@ netdev_vport_tunnel_register(void)
                                            NETDEV_VPORT_GET_IFINDEX),
         TUNNEL_CLASS("lisp", "lisp_sys", NULL, NULL, NULL, NULL),
         TUNNEL_CLASS("stt", "stt_sys", NULL, NULL, NULL, NULL),
-		TUNNEL_CLASS("erspan", "erspan_sys", NULL, NULL, NULL, NULL),
+        TUNNEL_CLASS("erspan", "erspan_sys", NULL, NULL, NULL, NULL),
     };
     static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
 

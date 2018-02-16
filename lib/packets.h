@@ -1246,7 +1246,31 @@ struct gre_base_hdr {
 #define GRE_FLAGS       0x00F8
 #define GRE_VERSION     0x0007
 
-/* ERSPAN protocol header */
+/* 
+ * ERSPAN protocol header and metadata
+ *
+ * Version 1 (Type II) header (8 octets [42:49])
+ *  0                   1                   2                   3
+ *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |  Ver  |          VLAN         | COS | En|T|    Session ID     |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |      Reserved         |                  Index                |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *
+ *
+ *  ERSPAN Version 2 (Type III) header (12 octets [42:49])
+ *  0                   1                   2                   3
+ *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |  Ver  |          VLAN         | COS |BSO|T|     Session ID    |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |                          Timestamp                            |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |             SGT               |P|    FT   |   Hw ID   |D|Gra|O|
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *
+ */
 struct erspan_md2 {
     ovs_be32 timestamp;
     ovs_be16 sgt;
@@ -1266,6 +1290,17 @@ struct erspan_metadata {
 		struct erspan_md2 md2;	/* Version 2 (type III) */
 	} u;
 };
+
+static inline uint8_t get_hwid(const struct erspan_md2 *md2)
+{
+    return (md2->hwid_upper << 4) + md2->hwid;
+}
+
+static inline void set_hwid(struct erspan_md2 *md2, uint8_t hwid)
+{
+    md2->hwid = hwid & 0xf;
+    md2->hwid_upper = (hwid >> 4) & 0x3;
+}
 
 /* VXLAN protocol header */
 struct vxlanhdr {
