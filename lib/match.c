@@ -1287,13 +1287,13 @@ format_flow_tunnel(struct ds *s, const struct match *match)
     if (wc->masks.tunnel.erspan_ver) {
         ds_put_format(s, "erspan_ver=%"PRIu8",", tnl->erspan_ver);
     }
-    if (wc->masks.tunnel.erspan_idx) {
+    if (wc->masks.tunnel.erspan_idx && tnl->erspan_ver == 1) {
         ds_put_format(s, "erspan_idx=%#"PRIx32",", tnl->erspan_idx);
     }
-    if (wc->masks.tunnel.erspan_dir) {
+    if (wc->masks.tunnel.erspan_dir && tnl->erspan_ver == 2) {
         ds_put_format(s, "erspan_dir=%"PRIu8",", tnl->erspan_dir);
     }
-    if (wc->masks.tunnel.erspan_hwid) {
+    if (wc->masks.tunnel.erspan_hwid && tnl->erspan_ver == 2) {
         ds_put_format(s, "erspan_hwid=%#"PRIx8",", tnl->erspan_hwid);
     }
     if (wc->masks.tunnel.flags & FLOW_TNL_F_MASK) {
