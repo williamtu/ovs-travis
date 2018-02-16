@@ -469,7 +469,7 @@ enum OVS_PACKED_ENUM mf_field_id {
      * ERSPAN vsersion (v1 / v2)
      *
      * Type: u8.
-     * Maskable: no.
+     * Maskable: bitwise.
      * Formatting: decimal.
      * Prerequisites: none.
      * Access: read/write.
@@ -483,7 +483,7 @@ enum OVS_PACKED_ENUM mf_field_id {
      * ERSPAN mirrored traffic's direction
      *
      * Type: u8.
-     * Maskable: no.
+     * Maskable: bitwise.
      * Formatting: decimal.
      * Prerequisites: none.
      * Access: read/write.
@@ -497,7 +497,7 @@ enum OVS_PACKED_ENUM mf_field_id {
      * ERSPAN Hardware ID
      *
      * Type: u8.
-     * Maskable: no.
+     * Maskable: bitwise.
      * Formatting: hexadecimal.
      * Prerequisites: none.
      * Access: read/write.

@@ -1285,13 +1285,13 @@ format_flow_tunnel(struct ds *s, const struct match *match)
         ds_put_format(s, "tun_ttl=%"PRIu8",", tnl->ip_ttl);
     }
     if (wc->masks.tunnel.erspan_ver) {
-        ds_put_format(s, "erspan_ver=%#"PRIu8",", tnl->erspan_ver);
+        ds_put_format(s, "erspan_ver=%"PRIu8",", tnl->erspan_ver);
     }
     if (wc->masks.tunnel.erspan_idx) {
         ds_put_format(s, "erspan_idx=%#"PRIx32",", tnl->erspan_idx);
     }
     if (wc->masks.tunnel.erspan_dir) {
-        ds_put_format(s, "erspan_dir=%#"PRIu8",", tnl->erspan_dir);
+        ds_put_format(s, "erspan_dir=%"PRIu8",", tnl->erspan_dir);
     }
     if (wc->masks.tunnel.erspan_hwid) {
         ds_put_format(s, "erspan_hwid=%#"PRIx8",", tnl->erspan_hwid);
