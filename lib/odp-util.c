@@ -4740,6 +4740,9 @@ scan_erspan_metadata(const char *s,
             s += 4;
             s += scan_u8(s, &dir, mask ? &dir_mask : NULL);
         }
+        if (s[0] == ',') {
+            s++;
+        }
         if (!strncmp(s, "hwid=", 5)) {
             s += 5;
             s += scan_u8(s, &hwid, mask ? &hwid_mask : NULL);
@@ -5283,14 +5286,6 @@ parse_odp_key_mask_attr(const char *s, const struct simap *port_names,
         SCAN_FIELD_NESTED("tp_src=", ovs_be16, be16, OVS_TUNNEL_KEY_ATTR_TP_SRC);
         SCAN_FIELD_NESTED("tp_dst=", ovs_be16, be16, OVS_TUNNEL_KEY_ATTR_TP_DST);
 
-/*
-        SCAN_BEGIN_NESTED("erspan(", OVS_TUNNEL_KEY_ATTR_ERSPAN_OPTS) {
-            SCAN_FIELD_NESTED("ver=", uint8_t, u8, OVS_ERSPAN_OPT_VER);
-            SCAN_FIELD_NESTED("idx=", uint32_t, u32, OVS_ERSPAN_OPT_IDX);
-            SCAN_FIELD_NESTED("dir=", uint8_t, u8, OVS_ERSPAN_OPT_DIR);
-            SCAN_FIELD_NESTED("hwid=", uint8_t, u8, OVS_ERSPAN_OPT_HWID);
-		} SCAN_END_NESTED();
-*/
         SCAN_FIELD_NESTED_FUNC("erspan(", struct erspan_metadata, erspan_metadata,
                                erspan_to_attr);
         // call scan_vxlan_gbp
