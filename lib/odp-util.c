@@ -2804,7 +2804,6 @@ tun_key_to_attr(struct ofpbuf *a, const struct flow_tnl *tun_key,
             opts.u.md2.dir = tun_key->erspan_dir;
             set_hwid(&opts.u.md2, tun_key->erspan_hwid);
         }
-
         nl_msg_put_unspec(a, OVS_TUNNEL_KEY_ATTR_ERSPAN_OPTS,
                           &opts, sizeof(opts));
     }
@@ -3269,11 +3268,11 @@ format_odp_tun_erspan_opt(const struct nlattr *attr,
                          const struct nlattr *mask_attr, struct ds *ds,
                          bool verbose)
 {
-    struct erspan_metadata *opts, *mask;
+    const struct erspan_metadata *opts, *mask;
     uint8_t ver, ver_ma, dir, dir_ma, hwid, hwid_ma;
 
-    opts = (struct erspan_metadata *)nl_attr_get(attr);
-    mask = mask_attr ? (struct erspan_metadata *)nl_attr_get(mask_attr) : NULL;
+    opts = nl_attr_get(attr);
+    mask = mask_attr ? nl_attr_get(mask_attr) : NULL;
 
     ver = (uint8_t)opts->version;
     if (mask) {
@@ -4730,7 +4729,7 @@ scan_erspan_metadata(const char *s,
     if (ver == 1) {
         if (!strncmp(s, "idx=", 4)) {
             s += 4;
-            s += scan_u32(s, &idx, mask ? &idx_mask : NULL); 
+            s += scan_u32(s, &idx, mask ? &idx_mask : NULL);
         }
     } else if (ver == 2) {
         if (!strncmp(s, "dir=", 4)) {

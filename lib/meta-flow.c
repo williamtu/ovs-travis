@@ -1932,8 +1932,8 @@ mf_set_wild(const struct mf_field *mf, struct match *match, char **err_str)
         match_set_tun_erspan_ver_masked(match, 0, 0);
         break;
     case MFF_TUN_ERSPAN_IDX:
-		match_set_tun_erspan_idx_masked(match, 0, 0);
-		break;
+        match_set_tun_erspan_idx_masked(match, 0, 0);
+        break;
     case MFF_TUN_ERSPAN_DIR:
         match_set_tun_erspan_dir_masked(match, 0, 0);
         break;

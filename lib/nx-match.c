@@ -98,7 +98,7 @@ enum ofp12_oxm_class {
 /* Functions for extracting raw field values from OXM/NXM headers. */
 static uint32_t nxm_vendor(uint64_t header) { return header; }
 static int nxm_class(uint64_t header) { return header >> 48; }
-static int nxm_field(uint64_t header) { return (header >> 41) & 0x7f; } //FIXME
+static int nxm_field(uint64_t header) { return (header >> 41) & 0x7f; }
 static bool nxm_hasmask(uint64_t header) { return (header >> 40) & 1; }
 static int nxm_length(uint64_t header) { return (header >> 32) & 0xff; }
 static uint64_t nxm_no_len(uint64_t header) { return header & 0xffffff80ffffffffULL; }
@@ -145,7 +145,6 @@ nxm_header_len(uint64_t header)
     return 4 + nxm_experimenter_len(header);
 }
 
-//FIXME: 48 - 41 = 7 bit 
 #define NXM_HEADER(VENDOR, CLASS, FIELD, HASMASK, LENGTH)       \
     (((uint64_t) (CLASS) << 48) |                               \
      ((uint64_t) (FIELD) << 41) |                               \

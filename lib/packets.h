@@ -1274,7 +1274,7 @@ struct gre_base_hdr {
 struct erspan_md2 {
     ovs_be32 timestamp;
     ovs_be16 sgt;
-	uint8_t hwid_upper:2,
+    uint8_t hwid_upper:2,
             ft:5,
             p:1;
     uint8_t o:1,
@@ -1284,11 +1284,11 @@ struct erspan_md2 {
 };
 
 struct erspan_metadata {
-	int version;
-	union {
-		ovs_be32 index;			/* Version 1 (type II)*/
-		struct erspan_md2 md2;	/* Version 2 (type III) */
-	} u;
+    int version;
+    union {
+        ovs_be32 index;         /* Version 1 (type II)*/
+        struct erspan_md2 md2;  /* Version 2 (type III) */
+    } u;
 };
 
 static inline uint8_t get_hwid(const struct erspan_md2 *md2)

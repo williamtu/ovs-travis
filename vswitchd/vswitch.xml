@@ -2623,7 +2623,7 @@
 
       <column name="options" key="erspan_hwid">
         <p>
-		  ERSPAN hardware ID is a 6-bit unique identifier of an
+          ERSPAN hardware ID is a 6-bit unique identifier of an
           ERSPAN v2 engine within a system.
         </p>
       </column>

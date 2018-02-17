@@ -738,10 +738,10 @@ get_tunnel_config(const struct netdev *dev, struct smap *args)
         smap_add_format(args, "erspan_idx", "0x%x", tnl_cfg.erspan_idx);
     }
     if (tnl_cfg.erspan_ver) {
-        smap_add_format(args, "erspan_ver", "0x%x", tnl_cfg.erspan_ver);
+        smap_add_format(args, "erspan_ver", "%d", tnl_cfg.erspan_ver);
     }
     if (tnl_cfg.erspan_dir) {
-        smap_add_format(args, "erspan_dir", "0x%x", tnl_cfg.erspan_dir);
+        smap_add_format(args, "erspan_dir", "%d", tnl_cfg.erspan_dir);
     }
     if (tnl_cfg.erspan_hwid) {
         smap_add_format(args, "erspan_hwid", "0x%x", tnl_cfg.erspan_hwid);
