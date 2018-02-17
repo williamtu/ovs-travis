@@ -459,8 +459,8 @@ enum OVS_PACKED_ENUM mf_field_id {
      * Formatting: hexadecimal.
      * Prerequisites: none.
      * Access: read/write.
-     * NXM: NXM_NX_TUN_ERSPAN_IDX(126) since v2.8.
-     * OXM: none.
+     * NXM: none.
+     * OXM: NXOXM_ET_ERSPAN_IDX(11) since OF1.5 and v2.8.
      */
     MFF_TUN_ERSPAN_IDX,
 
@@ -473,8 +473,8 @@ enum OVS_PACKED_ENUM mf_field_id {
      * Formatting: decimal.
      * Prerequisites: none.
      * Access: read/write.
-     * NXM: NXM_NX_TUN_ERSPAN_VER(127) since v2.8.
-     * OXM: none.
+     * NXM: none.
+     * OXM: NXOXM_ET_ERSPAN_VER(12) since OF1.5 and v2.8.
      */
     MFF_TUN_ERSPAN_VER,
 
@@ -487,8 +487,8 @@ enum OVS_PACKED_ENUM mf_field_id {
      * Formatting: decimal.
      * Prerequisites: none.
      * Access: read/write.
-     * NXM: NXM_NX_TUN_ERSPAN_DIR(128) since v2.8.
-     * OXM: none.
+     * NXM: none.
+     * OXM: NXOXM_ET_ERSPAN_DIR(13) since OF1.5 and v2.8.
      */
     MFF_TUN_ERSPAN_DIR,
 
@@ -501,8 +501,8 @@ enum OVS_PACKED_ENUM mf_field_id {
      * Formatting: hexadecimal.
      * Prerequisites: none.
      * Access: read/write.
-     * NXM: NXM_NX_TUN_ERSPAN_HWID(129) since v2.8.
-     * OXM: none.
+     * NXM: none.
+     * OXM: NXOXM_ET_ERSPAN_HWID(14) since OF1.5 and v2.8.
 	 */
     MFF_TUN_ERSPAN_HWID,
 

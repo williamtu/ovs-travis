@@ -1246,7 +1246,7 @@ struct gre_base_hdr {
 #define GRE_FLAGS       0x00F8
 #define GRE_VERSION     0x0007
 
-/* 
+/*
  * ERSPAN protocol header and metadata
  *
  * Version 1 (Type II) header (8 octets [42:49])
