@@ -1729,8 +1729,7 @@ ovs-ofctl add-flow br-int 'in_port=3,tun_src=192.168.1.1,tun_id=5001 actions=1'
       </p>
     </field>
 
-    <p> ERSPAN v1 header format </p>
-    <p> FIXME: we convert ERSPAN Session ID to tunnel id</p>
+    <p> ERSPAN version 1 header format:</p>
     <diagram>
 	  <header name="GRE">
 	    <bits name="..." above="16" width="0.4"/>
@@ -1752,6 +1751,10 @@ ovs-ofctl add-flow br-int 'in_port=3,tun_src=192.168.1.1,tun_id=5001 actions=1'
 	  <dots/>
     </diagram>
 
+    <p> ERSPAN has a fixed 8-byte GRE header, including 4-byte GRE base header
+        another 4-byte sequence number.  The ERSPAN's 10-bit session ID holds
+        the tunnel ID.
+    </p>
     <field id="MFF_TUN_ERSPAN_IDX" title="ERSPAN Index">
       <p>
         ERSPAN index is a 20-bit index/port number associated with the ERSPAN
@@ -1760,7 +1763,7 @@ ovs-ofctl add-flow br-int 'in_port=3,tun_src=192.168.1.1,tun_id=5001 actions=1'
       </p>
     </field>
     
-    <p> ERSPAN v2 header format:</p>
+    <p> ERSPAN version 2 header format:</p>
     <diagram>
 	  <header name="GRE">
 	    <bits name="..." above="16" width="0.4"/>
