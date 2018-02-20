@@ -236,9 +236,9 @@ enum ovs_vport_type {
 	OVS_VPORT_TYPE_GRE,      /* GRE tunnel. */
 	OVS_VPORT_TYPE_VXLAN,	 /* VXLAN tunnel. */
 	OVS_VPORT_TYPE_GENEVE,	 /* Geneve tunnel. */
-	OVS_VPORT_TYPE_ERSPAN,	 /* ERSPAN tunnel. */
 	OVS_VPORT_TYPE_LISP = 105,  /* LISP tunnel */
 	OVS_VPORT_TYPE_STT = 106, /* STT tunnel */
+	OVS_VPORT_TYPE_ERSPAN = 107, /* ERSPAN tunnel. */
 	__OVS_VPORT_TYPE_MAX
 };
 
