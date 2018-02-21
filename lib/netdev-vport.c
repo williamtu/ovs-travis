@@ -1001,7 +1001,10 @@ netdev_vport_tunnel_register(void)
                                            NETDEV_VPORT_GET_IFINDEX),
         TUNNEL_CLASS("lisp", "lisp_sys", NULL, NULL, NULL, NULL),
         TUNNEL_CLASS("stt", "stt_sys", NULL, NULL, NULL, NULL),
-        TUNNEL_CLASS("erspan", "erspan_sys", NULL, NULL, NULL, NULL),
+        TUNNEL_CLASS("erspan", "erspan_sys", netdev_erspan_build_header,
+                                             netdev_erspan_push_header,
+                                             netdev_erspan_pop_header,
+                                             NULL),
     };
     static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
 

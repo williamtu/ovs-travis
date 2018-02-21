@@ -404,6 +404,8 @@ ovs_be32 set_mpls_lse_values(uint8_t ttl, uint8_t tc, uint8_t bos,
 #define ETH_TYPE_MPLS          0x8847
 #define ETH_TYPE_MPLS_MCAST    0x8848
 #define ETH_TYPE_NSH           0x894f
+#define ETH_TYPE_ERSPAN1       0x88be   /* version 1 type II */
+#define ETH_TYPE_ERSPAN2       0x22eb   /* version 2 type III */
 
 static inline bool eth_type_mpls(ovs_be16 eth_type)
 {
@@ -1271,6 +1273,28 @@ struct gre_base_hdr {
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  *
  */
+
+/* ERSPAN has fixed 8-byte GRE header */
+#define ERSPAN_GREHDR_LEN   8
+#define ERSPAN_HDR(gre_base_hdr) \
+    ((struct erspan_base_hdr *)((char *)gre_base_hdr + ERSPAN_GREHDR_LEN))
+
+#define ERSPAN_V1_MDSIZE    4
+#define ERSPAN_V2_MDSIZE    8
+
+#define SID_MASK    0x03ff  /* 10-bit Session ID. */
+
+struct erspan_base_hdr {
+    uint8_t ver:4,
+            vlan_upper:4;
+    uint8_t vlan:8;
+    uint8_t cos:3,
+            en:2,
+            t:1,
+            session_id_upper:2;
+    uint8_t session_id:8;
+};
+
 struct erspan_md2 {
     ovs_be32 timestamp;
     ovs_be16 sgt;
@@ -1290,6 +1314,17 @@ struct erspan_metadata {
         struct erspan_md2 md2;  /* Version 2 (type III) */
     } u;
 };
+
+static inline uint16_t get_sid(const struct erspan_base_hdr *ershdr)
+{
+    return (ershdr->session_id_upper << 8) + ershdr->session_id;
+}
+
+static inline void set_sid(struct erspan_base_hdr *ershdr, uint16_t id)
+{
+    ershdr->session_id = id & 0xff;
+    ershdr->session_id_upper = (id >> 8) &0x3;
+}
 
 static inline uint8_t get_hwid(const struct erspan_md2 *md2)
 {

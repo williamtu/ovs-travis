@@ -712,6 +712,27 @@ format_odp_tnl_push_header(struct ds *ds, struct ovs_action_push_tnl *data)
             options++;
         }
         ds_put_format(ds, ")");
+    } else if (data->tnl_type == OVS_VPORT_TYPE_ERSPAN) { // For userspace datapath!!!
+        const struct gre_base_hdr *greh;
+        const struct erspan_base_hdr *ersh;
+
+        greh = (const struct gre_base_hdr *) l4;
+        ersh = (const struct erspan_base_hdr *) greh + ERSPAN_GREHDR_LEN;
+
+        if (ersh->ver == 1) {
+            const ovs_be32 *index;
+
+            index = (const ovs_be32 *)(ersh + 1);
+            ds_put_format(ds, "erspan(ver=1,sid=0x%"PRIx16",idx=0x%"PRIx32")",
+                          get_sid(ersh), ntohl(*index));
+        } else if (ersh->ver == 2) {
+            const struct erspan_md2 *md2;
+
+            md2 = (const struct erspan_md2 *)(ersh + 1);
+            ds_put_format(ds, "erspan(ver=2,sid=0x%"PRIx16
+                          ",dir=%"PRIu8"hwid=0x%"PRIx8")",
+                          get_sid(ersh), md2->dir, get_hwid(md2));
+        }
     }
     ds_put_format(ds, ")");
 }
@@ -1399,11 +1420,14 @@ ovs_parse_tnl_push(const char *s, struct ovs_action_push_tnl *data)
     struct ovs_16aligned_ip6_hdr *ip6;
     struct udp_header *udp;
     struct gre_base_hdr *greh;
-    uint16_t gre_proto, gre_flags, dl_type, udp_src, udp_dst, csum;
+    struct erspan_base_hdr *ersh;
+    struct erspan_md2 *md2;
+    uint16_t gre_proto, gre_flags, dl_type, udp_src, udp_dst, csum, sid;
     ovs_be32 sip, dip;
-    uint32_t tnl_type = 0, header_len = 0, ip_len = 0;
+    uint32_t tnl_type = 0, header_len = 0, ip_len = 0, erspan_idx = 0;
     void *l3, *l4;
     int n = 0;
+    uint8_t hwid, dir;
 
     if (!ovs_scan_len(s, &n, "tnl_push(tnl_port(%"SCNi32"),", &data->tnl_port)) {
         return -EINVAL;
@@ -1574,6 +1598,49 @@ ovs_parse_tnl_push(const char *s, struct ovs_action_push_tnl *data)
 
         header_len = sizeof *eth + ip_len +
                      ((uint8_t *) options - (uint8_t *) greh);
+    } else if (ovs_scan_len(s, &n, "erspan(ver=1,sid="SCNx16",idx=0x"SCNx32")",
+                            &sid, &erspan_idx)) {
+        ovs_be32 *index;
+
+        ersh = ERSPAN_HDR(greh);
+        index = (ovs_be32 *)(ersh + 1);
+
+        tnl_type = OVS_VPORT_TYPE_ERSPAN;
+        greh->flags = htons(GRE_SEQ);
+        greh->protocol = htons(ETH_TYPE_ERSPAN1);
+
+        ersh->ver = 1;
+        set_sid(ersh, sid);
+        *index = htonl(erspan_idx);
+
+        if (!ovs_scan_len(s, &n, ")")) {
+            return -EINVAL;
+        }
+
+        header_len = sizeof *eth + ip_len + ERSPAN_GREHDR_LEN +
+                     sizeof *ersh + ERSPAN_V1_MDSIZE;
+
+    } else if (ovs_scan_len(s, &n, "erspan(ver=2,sid="SCNx16"dir="SCNu8
+                            ",hwid=0x"SCNx8")", &sid, &dir, &hwid)) {
+
+        ersh = ERSPAN_HDR(greh);
+        md2 = (struct erspan_md2 *)(ersh + 1);
+
+        tnl_type = OVS_VPORT_TYPE_ERSPAN;
+        greh->flags = htons(GRE_SEQ);
+        greh->protocol = htons(ETH_TYPE_ERSPAN2);
+
+        ersh->ver = 2;
+        set_sid(ersh, sid);
+        set_hwid(md2, hwid);
+        md2->dir = dir;
+
+        if (!ovs_scan_len(s, &n, ")")) {
+            return -EINVAL;
+        }
+
+        header_len = sizeof *eth + ip_len + ERSPAN_GREHDR_LEN +
+                     sizeof *ersh + ERSPAN_V2_MDSIZE;
     } else {
         return -EINVAL;
     }
@@ -4714,8 +4781,8 @@ scan_erspan_metadata(const char *s,
 {
     const char *s_base = s;
     uint32_t idx, idx_mask;
-    uint8_t ver, dir, hwid;
-    uint8_t ver_mask, dir_mask, hwid_mask;
+    uint8_t ver = 0, dir = 0, hwid = 0;
+    uint8_t ver_mask = 0, dir_mask = 0, hwid_mask = 0;
 
     if (!strncmp(s, "ver=", 4)) {
         s += 4;
@@ -4731,6 +4798,17 @@ scan_erspan_metadata(const char *s,
             s += 4;
             s += scan_u32(s, &idx, mask ? &idx_mask : NULL);
         }
+
+        if (!strncmp(s, ")", 1)) {
+            s += 1;
+            key->version = ver;
+            key->u.index = htonl(idx);
+            if (mask) {
+                mask->u.index = htonl(idx_mask);
+            }
+        }
+        return s - s_base;
+
     } else if (ver == 2) {
         if (!strncmp(s, "dir=", 4)) {
             s += 4;
@@ -4743,18 +4821,10 @@ scan_erspan_metadata(const char *s,
             s += 5;
             s += scan_u8(s, &hwid, mask ? &hwid_mask : NULL);
         }
-    }
 
-    if (!strncmp(s, ")", 1)) {
-        s += 1;
-
-        key->version = ver;
-        if (key->version == 1) {
-            key->u.index = htonl(idx);
-            if (mask) {
-                mask->u.index = htonl(idx_mask);
-            }
-        } else {
+        if (!strncmp(s, ")", 1)) {
+            s += 1;
+            key->version = ver;
             key->u.md2.hwid = hwid;
             key->u.md2.dir = dir;
             if (mask) {
@@ -4762,7 +4832,6 @@ scan_erspan_metadata(const char *s,
                 mask->u.md2.dir = dir_mask;
             }
         }
-
         return s - s_base;
     }
 
