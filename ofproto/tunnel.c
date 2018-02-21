@@ -221,7 +221,7 @@ tnl_port_add(const struct ofport_dpif *ofport, const struct netdev *netdev,
     OVS_EXCLUDED(rwlock)
 {
     bool ok;
-
+VLOG_WARN("%s name %s\n",__func__, name);
     fat_rwlock_wrlock(&rwlock);
     ok = tnl_port_add__(ofport, netdev, odp_port, true, native_tnl, name);
     fat_rwlock_unlock(&rwlock);
@@ -552,6 +552,7 @@ tnl_find(const struct flow *flow) OVS_REQ_RDLOCK(rwlock)
     int ip_dst_flow;
     int i;
 
+VLOG_WARN("enter: %s", __func__);
     i = 0;
     for (in_key_flow = 0; in_key_flow < 2; in_key_flow++) {
         for (ip_dst_flow = 0; ip_dst_flow < 2; ip_dst_flow++) {

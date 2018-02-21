@@ -413,6 +413,7 @@ netdev_gre_pop_header(struct dp_packet *packet)
     struct flow_tnl *tnl = &md->tunnel;
     int hlen = sizeof(struct eth_header) + 4;
 
+VLOG_WARN("enter %s\n", __func__);
     hlen += netdev_tnl_is_header_ipv6(dp_packet_data(packet)) ?
             IPV6_HEADER_LEN : IP_HEADER_LEN;
 
@@ -509,6 +510,7 @@ netdev_erspan_pop_header(struct dp_packet *packet)
     unsigned int ulen;
     uint16_t greh_protocol;
 
+VLOG_WARN("enter %s\n", __func__);
     hlen += netdev_tnl_is_header_ipv6(dp_packet_data(packet)) ?
             IPV6_HEADER_LEN : IP_HEADER_LEN;
 

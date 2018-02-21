@@ -18,8 +18,12 @@ AT_CHECK([ovs-vsctl add-port int-br t2 -- set Interface t2 type=vxlan \
                        options:remote_ip=1.1.2.92 options:key=456 options:packet_type=legacy_l3 ofport_request=7\
                     -- add-port int-br t7 -- set Interface t7 type=vxlan \
                        options:remote_ip=1.1.2.92 options:key=345 options:exts=gpe ofport_request=8\
+                    -- add-port int-br t8 -- set Interface t8 type=erspan \
+                       options:remote_ip=1.1.2.94 options:key=567 options:erspan_ver=1 \
+                       options:erspan_idx=3 ofport_request=9\
                        ], [0])
 
+ovs-appctl vlog/set dbg
 AT_CHECK([ovs-appctl dpif/show], [0], [dnl
 dummy@ovs-dummy: hit:0 missed:0
 	br0:
@@ -27,13 +31,14 @@ dummy@ovs-dummy: hit:0 missed:0
 		p0 1/1: (dummy)
 	int-br:
 		int-br 65534/2: (dummy-internal)
-		t1 3/3: (gre: key=456, remote_ip=1.1.2.92)
+		t1 3/4: (gre: key=456, remote_ip=1.1.2.92)
 		t2 2/4789: (vxlan: key=123, remote_ip=1.1.2.92)
 		t3 4/4789: (vxlan: csum=true, out_key=flow, remote_ip=1.1.2.93)
 		t4 5/6081: (geneve: key=123, remote_ip=flow)
 		t5 6/6081: (geneve: egress_pkt_mark=1234, out_key=flow, remote_ip=1.1.2.93)
-		t6 7/3: (gre: key=456, packet_type=legacy_l3, remote_ip=1.1.2.92)
+		t6 7/4: (gre: key=456, packet_type=legacy_l3, remote_ip=1.1.2.92)
 		t7 8/4789: (vxlan: key=345, remote_ip=1.1.2.92)
+		t8 9/3: (erspan: erspan_idx=0x3, erspan_ver=1, key=567, remote_ip=1.1.2.94)
 ])
 
 dnl First setup dummy interface IP address, then add the route
@@ -72,16 +77,19 @@ ffffffffffffaa55aa55000008060001080006040001aa55aa550000010102580000000000000101
 dnl Check ARP Snoop
 AT_CHECK([ovs-appctl netdev-dummy/receive br0 'recirc_id(0),in_port(100),eth(src=f8:bc:12:44:34:b6,dst=ff:ff:ff:ff:ff:ff),eth_type(0x0806),arp(sip=1.1.2.92,tip=1.1.2.88,op=2,sha=f8:bc:12:44:34:b6,tha=00:00:00:00:00:00)'])
 AT_CHECK([ovs-appctl netdev-dummy/receive br0 'recirc_id(0),in_port(100),eth(src=f8:bc:12:44:34:b7,dst=ff:ff:ff:ff:ff:ff),eth_type(0x0806),arp(sip=1.1.2.93,tip=1.1.2.88,op=2,sha=f8:bc:12:44:34:b7,tha=00:00:00:00:00:00)'])
+AT_CHECK([ovs-appctl netdev-dummy/receive br0 'recirc_id(0),in_port(100),eth(src=f8:bc:12:44:34:b8,dst=ff:ff:ff:ff:ff:ff),eth_type(0x0806),arp(sip=1.1.2.94,tip=1.1.2.88,op=2,sha=f8:bc:12:44:34:b8,tha=00:00:00:00:00:00)'])
 
 AT_CHECK([ovs-appctl tnl/neigh/show | tail -n+3 | sort], [0], [dnl
 1.1.2.92                                      f8:bc:12:44:34:b6   br0
 1.1.2.93                                      f8:bc:12:44:34:b7   br0
+1.1.2.94                                      f8:bc:12:44:34:b8   br0
 ])
 
 AT_CHECK([ovs-appctl tnl/ports/show |sort], [0], [dnl
 Listening ports:
+erspan_sys (3) ref_cnt=1
 genev_sys_6081 (6081) ref_cnt=2
-gre_sys (3) ref_cnt=2
+gre_sys (4) ref_cnt=2
 vxlan_sys_4789 (4789) ref_cnt=3
 ])
 
@@ -92,7 +100,13 @@ AT_CHECK([tail -1 stdout], [0],
 ])
 
 dnl Check GRE tunnel pop
-AT_CHECK([ovs-appctl ofproto/trace ovs-dummy 'in_port(1),eth(src=f8:bc:12:44:34:b6,dst=aa:55:aa:55:00:00),eth_type(0x0800),ipv4(src=1.1.2.92,dst=1.1.2.88,proto=47,tos=0,ttl=64,frag=no)'], [0], [stdout])
+AT_CHECK([ovs-appctl ofproto/trace ovs-dummy 'in_port(1),eth(src=f8:bc:12:44:34:b6,dst=aa:55:aa:55:00:00),eth_type(0x0800),ipv4(src=1.1.11.93,dst=1.1.2.88,proto=47,tos=0,ttl=64,frag=no)'], [0], [stdout])
+AT_CHECK([tail -1 stdout], [0],
+  [Datapath actions: tnl_pop(4)
+])
+
+dnl Check ERSPAN tunnel pop
+AT_CHECK([ovs-appctl ofproto/trace ovs-dummy 'in_port(1),eth(src=f8:bc:12:44:34:b6,dst=aa:55:aa:55:00:00),eth_type(0x0800),ipv4(src=1.1.2.94,dst=1.1.2.88,proto=47,tos=0,ttl=64,frag=no)'], [0], [stdout])
 AT_CHECK([tail -1 stdout], [0],
   [Datapath actions: tnl_pop(3)
 ])

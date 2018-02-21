@@ -3785,6 +3785,8 @@ compose_output_action__(struct xlate_ctx *ctx, ofp_port_t ofp_port,
           */
         flow_tnl = flow->tunnel;
         odp_port = tnl_port_send(xport->ofport, flow, ctx->wc);
+
+	VLOG_WARN("%s ofport %d odp port %d\n", __func__, xport->ofport, odp_port);
         if (odp_port == ODPP_NONE) {
             xlate_report(ctx, OFT_WARN, "Tunneling decided against output");
             goto out; /* restore flow_nw_tos */
