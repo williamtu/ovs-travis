@@ -4780,7 +4780,7 @@ scan_erspan_metadata(const char *s,
                      struct erspan_metadata *mask)
 {
     const char *s_base = s;
-    uint32_t idx, idx_mask;
+    uint32_t idx = 0, idx_mask = 0;
     uint8_t ver = 0, dir = 0, hwid = 0;
     uint8_t ver_mask = 0, dir_mask = 0, hwid_mask = 0;
 
