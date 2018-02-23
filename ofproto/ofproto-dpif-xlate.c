@@ -3710,12 +3710,14 @@ terminate_native_tunnel(struct xlate_ctx *ctx, ofp_port_t ofp_port,
                         odp_port_t *tnl_port)
 {
     *tnl_port = ODPP_NONE;
-
+	
+	// xxxx
     /* XXX: Write better Filter for tunnel port. We can use in_port
      * in tunnel-port flow to avoid these checks completely. */
     if (ofp_port == OFPP_LOCAL &&
         ovs_native_tunneling_is_on(ctx->xbridge->ofproto)) {
         *tnl_port = tnl_port_map_lookup(flow, wc);
+		VLOG_WARN("%s found odp tunnel port %d\n", __func__, *tnl_port);
     }
 
     return *tnl_port != ODPP_NONE;
@@ -3813,6 +3815,7 @@ compose_output_action__(struct xlate_ctx *ctx, ofp_port_t ofp_port,
             xlate_report(ctx, OFT_DETAIL, "output to kernel tunnel");
             commit_odp_tunnel_action(flow, &ctx->base_flow, ctx->odp_actions);
             flow->tunnel = flow_tnl; /* Restore tunnel metadata */
+			VLOG_WARN("XXX %s NON native tunnel\n", __func__);
         }
     } else {
         odp_port = xport->odp_port;
@@ -3839,6 +3842,7 @@ compose_output_action__(struct xlate_ctx *ctx, ofp_port_t ofp_port,
                            xr->recirc_id);
         } else if (is_native_tunnel) {
             /* Output to native tunnel port. */
+			// Kernel datapath?
             native_tunnel_output(ctx, xport, flow, odp_port, truncate);
             flow->tunnel = flow_tnl; /* Restore tunnel metadata */
 

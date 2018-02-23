@@ -34,6 +34,9 @@
 #include "unixctl.h"
 #include "util.h"
 
+#include "openvswitch/vlog.h"
+VLOG_DEFINE_THIS_MODULE(tnl_ports);
+
 static struct ovs_mutex mutex = OVS_MUTEX_INITIALIZER;
 static struct classifier cls;   /* Tunnel ports. */
 
@@ -110,7 +113,10 @@ map_insert(odp_port_t port, struct eth_addr mac, struct in6_addr *addr,
     struct match match;
 
     memset(&match, 0, sizeof match);
-    tnl_port_init_flow(&match.flow, mac, addr, nw_proto, tp_port);
+	VLOG_WARN("%s map_insert nw_proto %d tp_port %u\n", __func__, nw_proto, ntohs(tp_port));
+
+dump_stack();
+    tnl_port_init_flow(&match.flow, mac, addr, nw_proto, tp_port);//
 
     do {
         cr = classifier_lookup(&cls, OVS_VERSION_MAX, &match.flow, NULL);

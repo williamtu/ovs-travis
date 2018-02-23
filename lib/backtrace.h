@@ -66,8 +66,10 @@
 struct backtrace {
     int n_frames;
     uintptr_t frames[BACKTRACE_MAX_FRAMES];
+    char *symbols[BACKTRACE_MAX_FRAMES];
 };
 
+void dump_stack(void);
 void backtrace_capture(struct backtrace *);
 void log_backtrace_at(const char *msg, const char *where);
 

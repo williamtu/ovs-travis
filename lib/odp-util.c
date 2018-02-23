@@ -717,7 +717,7 @@ format_odp_tnl_push_header(struct ds *ds, struct ovs_action_push_tnl *data)
         const struct erspan_base_hdr *ersh;
 
         greh = (const struct gre_base_hdr *) l4;
-        ersh = (const struct erspan_base_hdr *) greh + ERSPAN_GREHDR_LEN;
+        ersh = ERSPAN_HDR(greh);
 
         if (ersh->ver == 1) {
             const ovs_be32 *index;
@@ -730,9 +730,11 @@ format_odp_tnl_push_header(struct ds *ds, struct ovs_action_push_tnl *data)
 
             md2 = (const struct erspan_md2 *)(ersh + 1);
             ds_put_format(ds, "erspan(ver=2,sid=0x%"PRIx16
-                          ",dir=%"PRIu8"hwid=0x%"PRIx8")",
+                          ",dir=%"PRIu8",hwid=0x%"PRIx8")",
                           get_sid(ersh), md2->dir, get_hwid(md2));
-        }
+        } else {
+			VLOG_WARN("%s Invalid ERSPAN version %d\n", __func__, ersh->ver);
+		}
     }
     ds_put_format(ds, ")");
 }

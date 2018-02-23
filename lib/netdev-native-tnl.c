@@ -510,7 +510,7 @@ netdev_erspan_pop_header(struct dp_packet *packet)
     unsigned int ulen;
     uint16_t greh_protocol;
 
-VLOG_WARN("enter %s\n", __func__);
+VLOG_WARN("XXXX enter %s\n", __func__);
     hlen += netdev_tnl_is_header_ipv6(dp_packet_data(packet)) ?
             IPV6_HEADER_LEN : IP_HEADER_LEN;
 
@@ -580,12 +580,11 @@ netdev_erspan_push_header(struct dp_packet *packet,
     int ip_tot_size;
     ovs_be32 *seqno;
 
-
     greh = netdev_tnl_push_ip_header(packet, data->header, data->header_len, &ip_tot_size);
     seqno = (ovs_be32 *) (greh + 1);
     *seqno = htonl(ntohl(*seqno) + 1);
 
-    VLOG_WARN("%s header_len %d seq %d\n", __func__, data->header_len, *seqno);
+    VLOG_WARN("XXXX %s header_len %d seq %d\n", __func__, data->header_len, *seqno);
     return;
 }
 
@@ -606,7 +605,6 @@ netdev_erspan_build_header(const struct netdev *netdev,
     /* XXX: RCUfy tnl_cfg. */
     ovs_mutex_lock(&dev->mutex);
     tnl_cfg = &dev->tnl_cfg;
-
     greh = netdev_tnl_ip_build_header(data, params, IPPROTO_GRE);
     seqno = (ovs_be32 *) (greh + 1);
     ersh = ERSPAN_HDR(greh);
@@ -644,7 +642,11 @@ VLOG_WARN("v1 %s index %x sid %d hlen %d\n", __func__, ntohl(*index), sid, hlen)
         set_sid(ersh, sid);
 
         md2 = (struct erspan_md2 *)(ersh + 1);
-        set_hwid(md2, tnl_cfg->erspan_hwid);
+		if (tnl_cfg->erspan_hwid_flow) {
+        	set_hwid(md2, params->flow->tunnel.erspan_hwid);
+		} else {
+			set_hwid(md2, tnl_cfg->erspan_hwid);
+		}
         md2->dir = tnl_cfg->erspan_dir;
 
         hlen = ERSPAN_GREHDR_LEN + sizeof *ersh + ERSPAN_V2_MDSIZE;

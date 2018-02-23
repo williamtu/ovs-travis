@@ -540,13 +540,18 @@ set_tunnel_config(struct netdev *dev_, const struct smap *args, char **errp)
             tnl_cfg.egress_pkt_mark = strtoul(node->value, NULL, 10);
             tnl_cfg.set_egress_pkt_mark = true;
         } else if (!strcmp(node->key, "erspan_idx")) {
-            tnl_cfg.erspan_idx = atoi(node->value);
+            tnl_cfg.erspan_idx = strtol(node->value, NULL, 16);
         } else if (!strcmp(node->key, "erspan_ver")) {
             tnl_cfg.erspan_ver = atoi(node->value);
         } else if (!strcmp(node->key, "erspan_dir")) {
             tnl_cfg.erspan_dir = atoi(node->value);
         } else if (!strcmp(node->key, "erspan_hwid")) {
-            tnl_cfg.erspan_hwid = atoi(node->value);
+			if (!strcmp(node->value, "flow")) {
+				tnl_cfg.erspan_hwid_flow = true;
+			} else {
+				tnl_cfg.erspan_hwid_flow = false;
+	            tnl_cfg.erspan_hwid = strtol(node->value, NULL, 16);
+			}
         } else {
             ds_put_format(&errors, "%s: unknown %s argument '%s'\n", name,
                           type, node->key);
@@ -743,9 +748,13 @@ get_tunnel_config(const struct netdev *dev, struct smap *args)
     if (tnl_cfg.erspan_dir) {
         smap_add_format(args, "erspan_dir", "%d", tnl_cfg.erspan_dir);
     }
-    if (tnl_cfg.erspan_hwid) {
-        smap_add_format(args, "erspan_hwid", "0x%x", tnl_cfg.erspan_hwid);
-    }
+    if (!tnl_cfg.erspan_hwid_flow) {
+		if (tnl_cfg.erspan_hwid) {
+	        smap_add_format(args, "erspan_hwid", "0x%x", tnl_cfg.erspan_hwid);
+		}
+    } else {
+	        smap_add_format(args, "erspan_hwid", "%s", "flow");
+	}
 
     return 0;
 }
