@@ -207,6 +207,8 @@ tnl_port_add__(const struct ofport_dpif *ofport, const struct netdev *netdev,
         tnl_port_map_insert(odp_port, cfg->dst_port, name, type);
 
     }
+
+	VLOG_WARN("%s add tnl port, tun_id %llx ofport %p\n", __func__, cfg->in_key, ofport);
     return true;
 }
 
@@ -411,6 +413,10 @@ tnl_port_send(const struct ofport_dpif *ofport, struct flow *flow,
         goto out;
     }
 
+VLOG_WARN("%s tnl port %d name %s ofport %p\n", __func__, 
+							tnl_port->match.odp_port,
+							tnl_port_get_name(tnl_port),
+							ofport);
     cfg = netdev_get_tunnel_config(tnl_port->netdev);
     ovs_assert(cfg);
 

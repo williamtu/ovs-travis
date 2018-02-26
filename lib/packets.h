@@ -1285,13 +1285,13 @@ struct gre_base_hdr {
 #define SID_MASK    0x03ff  /* 10-bit Session ID. */
 
 struct erspan_base_hdr {
-    uint8_t ver:4,
-            vlan_upper:4;
+    uint8_t vlan_upper:4,
+			ver:4;
     uint8_t vlan:8;
-    uint8_t cos:3,
-            en:2,
+    uint8_t session_id_upper:2,
             t:1,
-            session_id_upper:2;
+            en:2,
+			cos:3;
     uint8_t session_id:8;
 };
 

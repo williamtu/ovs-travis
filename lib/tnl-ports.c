@@ -115,7 +115,7 @@ map_insert(odp_port_t port, struct eth_addr mac, struct in6_addr *addr,
     memset(&match, 0, sizeof match);
 	VLOG_WARN("%s map_insert nw_proto %d tp_port %u\n", __func__, nw_proto, ntohs(tp_port));
 
-dump_stack();
+//dump_stack();
     tnl_port_init_flow(&match.flow, mac, addr, nw_proto, tp_port);//
 
     do {

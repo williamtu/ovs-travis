@@ -222,7 +222,7 @@ netdev_tnl_push_udp_header(struct dp_packet *packet,
     int ip_tot_size;
 
     udp = netdev_tnl_push_ip_header(packet, data->header, data->header_len, &ip_tot_size);
-
+VLOG_WARN("XXX enter %s\n", __func__);
     /* set udp src port */
     udp->udp_src = netdev_tnl_get_src_port(packet);
     udp->udp_len = htons(ip_tot_size);
@@ -510,7 +510,6 @@ netdev_erspan_pop_header(struct dp_packet *packet)
     unsigned int ulen;
     uint16_t greh_protocol;
 
-VLOG_WARN("XXXX enter %s\n", __func__);
     hlen += netdev_tnl_is_header_ipv6(dp_packet_data(packet)) ?
             IPV6_HEADER_LEN : IP_HEADER_LEN;
 
@@ -555,7 +554,10 @@ VLOG_WARN("v1 %s index %x tnl->id %d hlen %d\n", __func__, ntohl(*index), get_si
         tnl->erspan_hwid = get_hwid(md);
         tnl->flags |= FLOW_TNL_F_KEY;
         hlen = ulen + ERSPAN_GREHDR_LEN + sizeof *ersh + ERSPAN_V2_MDSIZE;
+VLOG_WARN("v2 %s tnl->id %d hwid %x hlen %d\n", __func__, get_sid(ersh), get_hwid(md), hlen);
     } else {
+
+		VLOG_WARN("\t version error %d", ersh->ver);
         goto err;
     }
 
@@ -795,7 +797,7 @@ netdev_geneve_pop_header(struct dp_packet *packet)
     struct flow_tnl *tnl = &md->tunnel;
     struct genevehdr *gnh;
     unsigned int hlen, opts_len, ulen;
-
+VLOG_WARN("XXX enter %s\n", __func__);
     pkt_metadata_init_tnl(md);
     if (GENEVE_BASE_HLEN > dp_packet_l4_size(packet)) {
         VLOG_WARN_RL(&err_rl, "geneve packet too small: min header=%u packet size=%"PRIuSIZE"\n",

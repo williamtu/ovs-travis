@@ -627,6 +627,7 @@ set_tunnel_config(struct netdev *dev_, const struct smap *args, char **errp)
                                &tnl_cfg.out_key_present,
                                &tnl_cfg.out_key_flow);
 
+VLOG_WARN("%s in_key %llx\n", __func__, tnl_cfg.in_key);
     ovs_mutex_lock(&dev->mutex);
     if (memcmp(&dev->tnl_cfg, &tnl_cfg, sizeof tnl_cfg)) {
         dev->tnl_cfg = tnl_cfg;
