@@ -540,13 +540,13 @@ set_tunnel_config(struct netdev *dev_, const struct smap *args, char **errp)
             tnl_cfg.egress_pkt_mark = strtoul(node->value, NULL, 10);
             tnl_cfg.set_egress_pkt_mark = true;
         } else if (!strcmp(node->key, "erspan_idx")) {
-            tnl_cfg.erspan_idx = atoi(node->value);
+            tnl_cfg.erspan_idx = strtol(node->value, NULL, 16);
         } else if (!strcmp(node->key, "erspan_ver")) {
             tnl_cfg.erspan_ver = atoi(node->value);
         } else if (!strcmp(node->key, "erspan_dir")) {
             tnl_cfg.erspan_dir = atoi(node->value);
         } else if (!strcmp(node->key, "erspan_hwid")) {
-            tnl_cfg.erspan_hwid = atoi(node->value);
+            tnl_cfg.erspan_hwid = strtol(node->value, NULL, 16);
         } else {
             ds_put_format(&errors, "%s: unknown %s argument '%s'\n", name,
                           type, node->key);
@@ -1001,7 +1001,10 @@ netdev_vport_tunnel_register(void)
                                            NETDEV_VPORT_GET_IFINDEX),
         TUNNEL_CLASS("lisp", "lisp_sys", NULL, NULL, NULL, NULL),
         TUNNEL_CLASS("stt", "stt_sys", NULL, NULL, NULL, NULL),
-        TUNNEL_CLASS("erspan", "erspan_sys", NULL, NULL, NULL, NULL),
+        TUNNEL_CLASS("erspan", "erspan_sys", netdev_erspan_build_header,
+                                             netdev_erspan_push_header,
+                                             netdev_erspan_pop_header,
+                                             NULL),
     };
     static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
 
