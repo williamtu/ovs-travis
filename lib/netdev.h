@@ -128,11 +128,11 @@ struct netdev_tunnel_config {
     bool dont_fragment;
     enum netdev_pt_mode pt_mode;
 
+    uint32_t seqno; /* Use in GRE */
     uint32_t erspan_idx;
     uint8_t erspan_ver;
     uint8_t erspan_dir;
     uint8_t erspan_hwid;
-    uint32_t erspan_seqno;
 };
 
 void netdev_run(void);

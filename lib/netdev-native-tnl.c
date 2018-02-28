@@ -215,7 +215,8 @@ udp_extract_tnl_md(struct dp_packet *packet, struct flow_tnl *tnl,
 
 
 void
-netdev_tnl_push_udp_header(struct dp_packet *packet,
+netdev_tnl_push_udp_header(const struct netdev *netdev OVS_UNUSED,
+                           struct dp_packet *packet,
                            const struct ovs_action_push_tnl *data)
 {
     struct udp_header *udp;
@@ -435,7 +436,8 @@ err:
 }
 
 void
-netdev_gre_push_header(struct dp_packet *packet,
+netdev_gre_push_header(const struct netdev *netdev OVS_UNUSED,
+                       struct dp_packet *packet,
                        const struct ovs_action_push_tnl *data)
 {
     struct gre_base_hdr *greh;
@@ -568,12 +570,13 @@ err:
     return NULL;
 }
 
-static uint32_t g_seqno;
-
 void
-netdev_erspan_push_header(struct dp_packet *packet,
+netdev_erspan_push_header(const struct netdev *netdev,
+                          struct dp_packet *packet,
                           const struct ovs_action_push_tnl *data)
 {
+    struct netdev_vport *dev = netdev_vport_cast(netdev);
+    struct netdev_tunnel_config *tnl_cfg;
     struct erspan_base_hdr *ersh;
     struct gre_base_hdr *greh;
     struct erspan_md2 *md2;
@@ -583,8 +586,9 @@ netdev_erspan_push_header(struct dp_packet *packet,
     greh = netdev_tnl_push_ip_header(packet, data->header,
                                      data->header_len, &ip_tot_size);
     /* update GRE seqno */
+    tnl_cfg = &dev->tnl_cfg;
     seqno = (ovs_be32 *)(greh + 1);
-    *seqno = htonl(g_seqno++);
+    *seqno = htonl(tnl_cfg->seqno++);
 
     /* update v2 timestamp */
     if (greh->protocol == htons(ETH_TYPE_ERSPAN2)) {
@@ -607,13 +611,11 @@ netdev_erspan_build_header(const struct netdev *netdev,
     unsigned int hlen;
     uint32_t tun_id;
     uint16_t sid;
-    ovs_be32 *seqno;
 
     /* XXX: RCUfy tnl_cfg. */
     ovs_mutex_lock(&dev->mutex);
     tnl_cfg = &dev->tnl_cfg;
     greh = netdev_tnl_ip_build_header(data, params, IPPROTO_GRE);
-    seqno = (ovs_be32 *) (greh + 1);
     ersh = ERSPAN_HDR(greh);
 
     tun_id = ntohl(be64_to_be32(params->flow->tunnel.tun_id));
@@ -623,11 +625,7 @@ netdev_erspan_build_header(const struct netdev *netdev,
     } else {
         sid = (uint16_t) tun_id;
     }
-/*
-tnl_cfg->erspan_seqno++;
-    *seqno = htonl(tnl_cfg->erspan_seqno);
-VLOG_WARN("seqno %d\n", tnl_cfg->erspan_seqno);
-*/
+
     if (tnl_cfg->erspan_ver == 1) {
         ovs_be32 *index;
 
