@@ -32,6 +32,7 @@
 #include "tun-metadata.h"
 #include "unaligned.h"
 #include "util.h"
+#include "timeval.h"
 
 struct dp_packet;
 struct ds;
@@ -1335,6 +1336,37 @@ static inline void set_hwid(struct erspan_md2 *md2, uint8_t hwid)
 {
     md2->hwid = hwid & 0xf;
     md2->hwid_upper = (hwid >> 4) & 0x3;
+}
+
+/* ERSPAN timestamp granularity
+ *   00b --> granularity = 100 microseconds
+ *   01b --> granularity = 100 nanoseconds
+ *   10b --> granularity = IEEE 1588
+ * Here we only support 100 microseconds.
+ */
+enum erspan_ts_gra {
+	ERSPAN_100US,
+	ERSPAN_100NS,
+	ERSPAN_IEEE1588,
+};
+
+static inline ovs_be32 get_erspan_ts(enum erspan_ts_gra gra)
+{
+	ovs_be32 ts = 0;
+
+	switch (gra) {
+	case ERSPAN_100US:
+		ts = htonl((uint32_t)(time_wall_usec() / 100));
+		break;
+	case ERSPAN_100NS:
+		/* fall back */
+	case ERSPAN_IEEE1588:
+		/* fall back */
+	default:
+		OVS_NOT_REACHED();
+		break;
+	}
+	return ts;
 }
 
 /* VXLAN protocol header */

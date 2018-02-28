@@ -574,28 +574,24 @@ void
 netdev_erspan_push_header(struct dp_packet *packet,
                           const struct ovs_action_push_tnl *data)
 {
+    struct erspan_base_hdr *ersh;
     struct gre_base_hdr *greh;
-    struct ip_header *iph;
+    struct erspan_md2 *md2;
     int ip_tot_size;
-    ovs_be32 *seqno, old_seq, new_seq;
+    ovs_be32 *seqno;
 
     greh = netdev_tnl_push_ip_header(packet, data->header,
                                      data->header_len, &ip_tot_size);
-    iph = dp_packet_l3(packet);
+    /* update GRE seqno */
+    seqno = (ovs_be32 *)(greh + 1);
+    *seqno = htonl(g_seqno++);
 
-    /* update seqno and outer ip csum */
-    seqno = (ovs_be32 *) (greh + 1);
-    old_seq = htonl(g_seqno);
-    g_seqno++;
-    new_seq = htonl(g_seqno);
-
-    VLOG_WARN("%s old %x new %x old csum %x\n",
-              __func__, ntohl(old_seq), ntohl(new_seq), iph->ip_csum);
-
-  //  iph->ip_csum = recalc_csum32(iph->ip_csum, old_seq, new_seq);
-
-    VLOG_WARN("new csum %x\n", iph->ip_csum);
-    *seqno = new_seq;
+    /* update v2 timestamp */
+    if (greh->protocol == htons(ETH_TYPE_ERSPAN2)) {
+        ersh = ERSPAN_HDR(greh);
+        md2 = (struct erspan_md2 *)(ersh + 1);
+        md2->timestamp = get_erspan_ts(ERSPAN_100US);
+    }
     return;
 }
 
@@ -653,6 +649,9 @@ VLOG_WARN("seqno %d\n", tnl_cfg->erspan_seqno);
         set_sid(ersh, sid);
 
         md2 = (struct erspan_md2 *)(ersh + 1);
+        md2->sgt = 0; /* security group tag */
+        md2->gra = 0;
+        md2->timestamp = 0;
         set_hwid(md2, tnl_cfg->erspan_hwid);
         md2->dir = tnl_cfg->erspan_dir;
 
