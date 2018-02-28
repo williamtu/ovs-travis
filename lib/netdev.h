@@ -132,6 +132,7 @@ struct netdev_tunnel_config {
     uint8_t erspan_ver;
     uint8_t erspan_dir;
     uint8_t erspan_hwid;
+    uint32_t erspan_seqno;
 };
 
 void netdev_run(void);

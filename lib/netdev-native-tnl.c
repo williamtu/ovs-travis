@@ -568,6 +568,8 @@ err:
     return NULL;
 }
 
+static uint32_t g_seqno;
+
 void
 netdev_erspan_push_header(struct dp_packet *packet,
                           const struct ovs_action_push_tnl *data)
@@ -575,7 +577,7 @@ netdev_erspan_push_header(struct dp_packet *packet,
     struct gre_base_hdr *greh;
     struct ip_header *iph;
     int ip_tot_size;
-    ovs_be32 *seqno, new_seq;
+    ovs_be32 *seqno, old_seq, new_seq;
 
     greh = netdev_tnl_push_ip_header(packet, data->header,
                                      data->header_len, &ip_tot_size);
@@ -583,9 +585,18 @@ netdev_erspan_push_header(struct dp_packet *packet,
 
     /* update seqno and outer ip csum */
     seqno = (ovs_be32 *) (greh + 1);
-    new_seq = htonl(ntohl(*seqno) + 1);
-    iph->ip_csum = recalc_csum32(iph->ip_csum, *seqno, new_seq);
+    old_seq = htonl(g_seqno);
+    g_seqno++;
+    new_seq = htonl(g_seqno);
+
+    VLOG_WARN("%s old %x new %x old csum %x\n",
+              __func__, ntohl(old_seq), ntohl(new_seq), iph->ip_csum);
+
+  //  iph->ip_csum = recalc_csum32(iph->ip_csum, old_seq, new_seq);
+
+    VLOG_WARN("new csum %x\n", iph->ip_csum);
     *seqno = new_seq;
+    return;
 }
 
 int
@@ -616,8 +627,11 @@ netdev_erspan_build_header(const struct netdev *netdev,
     } else {
         sid = (uint16_t) tun_id;
     }
-    *seqno = 0;
-
+/*
+tnl_cfg->erspan_seqno++;
+    *seqno = htonl(tnl_cfg->erspan_seqno);
+VLOG_WARN("seqno %d\n", tnl_cfg->erspan_seqno);
+*/
     if (tnl_cfg->erspan_ver == 1) {
         ovs_be32 *index;
 
@@ -645,6 +659,7 @@ netdev_erspan_build_header(const struct netdev *netdev,
         hlen = ERSPAN_GREHDR_LEN + sizeof *ersh + ERSPAN_V2_MDSIZE;
     } else {
         VLOG_WARN_RL(&err_rl, "ERSPAN version error %d", tnl_cfg->erspan_ver);
+        ovs_mutex_unlock(&dev->mutex);
         return 1;
     }
 
