@@ -1283,7 +1283,10 @@ struct gre_base_hdr {
 #define ERSPAN_V1_MDSIZE    4
 #define ERSPAN_V2_MDSIZE    8
 
-#define SID_MASK    0x03ff  /* 10-bit Session ID. */
+#define ERSPAN_SID_MASK     0x03ff  /* 10-bit Session ID. */
+#define ERSPAN_IDX_MASK     0xfffff /* v1 Index */
+#define ERSPAN_HWID_MASK    0x03f0
+#define ERSPAN_DIR_MASK     0x0008
 
 struct erspan_base_hdr {
     uint8_t vlan_upper:4,

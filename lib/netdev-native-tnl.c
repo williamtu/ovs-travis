@@ -620,7 +620,7 @@ netdev_erspan_build_header(const struct netdev *netdev,
 
     tun_id = ntohl(be64_to_be32(params->flow->tunnel.tun_id));
     /* ERSPAN only has 10-bit session ID */
-    if (tun_id & ~SID_MASK) {
+    if (tun_id & ~ERSPAN_SID_MASK) {
         return 1;
     } else {
         sid = (uint16_t) tun_id;

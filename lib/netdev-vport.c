@@ -541,12 +541,36 @@ set_tunnel_config(struct netdev *dev_, const struct smap *args, char **errp)
             tnl_cfg.set_egress_pkt_mark = true;
         } else if (!strcmp(node->key, "erspan_idx")) {
             tnl_cfg.erspan_idx = strtol(node->value, NULL, 16);
+            if (tnl_cfg.erspan_idx & ~ERSPAN_IDX_MASK) {
+                ds_put_format(&errors, "%s: invalid erspan index: %s\n",
+                              name, node->value);
+                err = EINVAL;
+                goto out;
+            }
         } else if (!strcmp(node->key, "erspan_ver")) {
             tnl_cfg.erspan_ver = atoi(node->value);
+            if (tnl_cfg.erspan_ver != 1 && tnl_cfg.erspan_ver != 2) {
+                ds_put_format(&errors, "%s: invalid erspan version: %s\n",
+                              name, node->value);
+                err = EINVAL;
+                goto out;
+            }
         } else if (!strcmp(node->key, "erspan_dir")) {
             tnl_cfg.erspan_dir = atoi(node->value);
+            if (tnl_cfg.erspan_dir != 0 && tnl_cfg.erspan_dir != 1) {
+                ds_put_format(&errors, "%s: invalid erspan direction: %s\n",
+                              name, node->value);
+                err = EINVAL;
+                goto out;
+            }
         } else if (!strcmp(node->key, "erspan_hwid")) {
             tnl_cfg.erspan_hwid = strtol(node->value, NULL, 16);
+            if (tnl_cfg.erspan_hwid & ~(ERSPAN_HWID_MASK >> 4)) {
+                ds_put_format(&errors, "%s: invalid erspan hardware ID: %s\n",
+                              name, node->value);
+                err = EINVAL;
+                goto out;
+            }
         } else {
             ds_put_format(&errors, "%s: unknown %s argument '%s'\n", name,
                           type, node->key);
