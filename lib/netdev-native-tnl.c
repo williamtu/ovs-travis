@@ -165,6 +165,7 @@ netdev_tnl_push_ip_header(struct dp_packet *packet,
         *ip_tot_size -= IPV6_HEADER_LEN;
         ip6->ip6_plen = htons(*ip_tot_size);
         packet->l4_ofs = dp_packet_size(packet) - *ip_tot_size;
+ VLOG_WARN("%s\n", __func__);
         return ip6 + 1;
     } else {
         ip = netdev_tnl_ip_hdr(eth);
@@ -514,6 +515,8 @@ netdev_erspan_pop_header(struct dp_packet *packet)
     hlen += netdev_tnl_is_header_ipv6(dp_packet_data(packet)) ?
             IPV6_HEADER_LEN : IP_HEADER_LEN;
 
+VLOG_WARN("%s hlen %d\n", __func__, hlen);
+
     pkt_metadata_init_tnl(md);
     if (hlen > dp_packet_size(packet)) {
         goto err;
@@ -540,7 +543,7 @@ netdev_erspan_pop_header(struct dp_packet *packet)
 
     if (ersh->ver == 1) {
         ovs_be32 *index;
-
+VLOG_WARN("erspan v1");
         index = (ovs_be32 *)(ersh + 1);
         tnl->erspan_idx = ntohl(*index);
         tnl->flags |= FLOW_TNL_F_KEY;
@@ -585,6 +588,7 @@ netdev_erspan_push_header(const struct netdev *netdev,
 
     greh = netdev_tnl_push_ip_header(packet, data->header,
                                      data->header_len, &ip_tot_size);
+
     /* update GRE seqno */
     tnl_cfg = &dev->tnl_cfg;
     seqno = (ovs_be32 *)(greh + 1);
@@ -663,7 +667,12 @@ netdev_erspan_build_header(const struct netdev *netdev,
     ovs_mutex_unlock(&dev->mutex);
 
     data->header_len += hlen;
-    data->tnl_type = OVS_VPORT_TYPE_ERSPAN;
+
+    if (params->is_ipv6) {
+        data->tnl_type = OVS_VPORT_TYPE_IP6ERSPAN;
+    } else {
+        data->tnl_type = OVS_VPORT_TYPE_ERSPAN;
+    }
     return 0;
 }
 

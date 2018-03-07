@@ -5514,7 +5514,7 @@ dp_execute_cb(void *aux_, struct dp_packet_batch *packets_,
         if (*depth < MAX_RECIRC_DEPTH) {
             struct dp_packet_batch *orig_packets_ = packets_;
             odp_port_t portno = nl_attr_get_odp_port(a);
-
+VLOG_WARN("%s tunnel pop\n", __func__);
             p = pmd_tnl_port_cache_lookup(pmd, portno);
             if (p) {
                 struct dp_packet_batch tnl_pkt;

@@ -3267,6 +3267,7 @@ propagate_tunnel_data_to_flow(struct xlate_ctx *ctx, struct eth_addr dmac,
     switch (tnl_type) {
     case OVS_VPORT_TYPE_GRE:
     case OVS_VPORT_TYPE_ERSPAN:
+    case OVS_VPORT_TYPE_IP6ERSPAN:
         nw_proto = IPPROTO_GRE;
         break;
     case OVS_VPORT_TYPE_VXLAN:

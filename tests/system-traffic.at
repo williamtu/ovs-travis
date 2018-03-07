@@ -538,8 +538,8 @@ AT_CHECK([ovs-ofctl add-flow br-underlay "actions=normal"])
 ADD_NAMESPACES(at_ns0)
 
 dnl Set up underlay link from host into the namespace using veth pair.
-ADD_VETH(p0, at_ns0, br-underlay, "fc00::1/64", [], [], "nodad")
-AT_CHECK([ip addr add dev br-underlay "fc00::100/64" nodad])
+ADD_VETH(p0, at_ns0, br-underlay, "fc00::1/64", [], [], [])
+AT_CHECK([ip addr add dev br-underlay "fc00::100/64"])
 AT_CHECK([ip link set dev br-underlay up])
 
 dnl Set up tunnel endpoints on OVS outside the namespace and with a native

@@ -712,7 +712,8 @@ format_odp_tnl_push_header(struct ds *ds, struct ovs_action_push_tnl *data)
             options++;
         }
         ds_put_format(ds, ")");
-    } else if (data->tnl_type == OVS_VPORT_TYPE_ERSPAN) {
+    } else if (data->tnl_type == OVS_VPORT_TYPE_ERSPAN ||
+               data->tnl_type == OVS_VPORT_TYPE_IP6ERSPAN) {
         const struct gre_base_hdr *greh;
         const struct erspan_base_hdr *ersh;
 
@@ -1607,7 +1608,12 @@ ovs_parse_tnl_push(const char *s, struct ovs_action_push_tnl *data)
         ersh = ERSPAN_HDR(greh);
         index = (ovs_be32 *)(ersh + 1);
 
-        tnl_type = OVS_VPORT_TYPE_ERSPAN;
+        if (eth->eth_type == htons(ETH_TYPE_IP)) {
+            tnl_type = OVS_VPORT_TYPE_ERSPAN;
+        } else {
+            tnl_type = OVS_VPORT_TYPE_IP6ERSPAN;
+        }
+
         greh->flags = htons(GRE_SEQ);
         greh->protocol = htons(ETH_TYPE_ERSPAN1);
 
@@ -1618,7 +1624,7 @@ ovs_parse_tnl_push(const char *s, struct ovs_action_push_tnl *data)
         if (!ovs_scan_len(s, &n, ")")) {
             return -EINVAL;
         }
-
+VLOG_WARN("%s ip_len %d\n", __func__, ip_len);
         header_len = sizeof *eth + ip_len + ERSPAN_GREHDR_LEN +
                      sizeof *ersh + ERSPAN_V1_MDSIZE;
 
@@ -1628,7 +1634,12 @@ ovs_parse_tnl_push(const char *s, struct ovs_action_push_tnl *data)
         ersh = ERSPAN_HDR(greh);
         md2 = (struct erspan_md2 *)(ersh + 1);
 
-        tnl_type = OVS_VPORT_TYPE_ERSPAN;
+        if (eth->eth_type == htons(ETH_TYPE_IP)) {
+            tnl_type = OVS_VPORT_TYPE_ERSPAN;
+        } else {
+            tnl_type = OVS_VPORT_TYPE_IP6ERSPAN;
+        }
+
         greh->flags = htons(GRE_SEQ);
         greh->protocol = htons(ETH_TYPE_ERSPAN2);
 
