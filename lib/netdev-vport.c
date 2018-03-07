@@ -1029,6 +1029,9 @@ netdev_vport_tunnel_register(void)
                                              netdev_erspan_push_header,
                                              netdev_erspan_pop_header,
                                              NULL),
+        TUNNEL_CLASS("ip6erspan", "ip6erspan_sys", NULL, NULL, NULL, 
+                                             NULL),
+ 
     };
     static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
 

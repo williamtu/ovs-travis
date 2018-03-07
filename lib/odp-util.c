@@ -4980,6 +4980,9 @@ erspan_to_attr(struct ofpbuf *a, const void *data_)
 {
     const struct erspan_metadata *md = data_;
 
+VLOG_WARN("%s md->version %d\n", __func__, md->version);
+printf("%s md->version %d\n", __func__, md->version);
+
     nl_msg_put_unspec(a, OVS_TUNNEL_KEY_ATTR_ERSPAN_OPTS, md,
                       sizeof *md);
 }
