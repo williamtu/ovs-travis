@@ -58,6 +58,30 @@ static struct vlog_rate_limit err_rl = VLOG_RATE_LIMIT_INIT(60, 5);
 uint16_t tnl_udp_port_min = 32768;
 uint16_t tnl_udp_port_max = 61000;
 
+/* Handle RFC2460 IPv6 extension headers */
+static int
+netdev_tnl_ip6_exthdr(const struct ovs_16aligned_ip6_hdr *ip6)
+{
+    int nxt_hdr, extlen = 0;
+    char *exthdr;
+
+    exthdr = (char *)(ip6 + 1);
+    nxt_hdr = ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
+
+    switch (nxt_hdr) {
+    case IPPROTO_DSTOPTS:
+    case IPPROTO_HOPOPTS:
+    case IPPROTO_ROUTING:
+        extlen = (exthdr[1] + 1) << 3;
+        VLOG_WARN("XXX extlen %d", extlen);
+        break;
+    case IPPROTO_FRAGMENT:
+    default:
+        break;
+    }
+    return extlen;
+}
+
 void *
 netdev_tnl_ip_extract_tnl_md(struct dp_packet *packet, struct flow_tnl *tnl,
                   unsigned int *hlen)
@@ -124,12 +148,7 @@ netdev_tnl_ip_extract_tnl_md(struct dp_packet *packet, struct flow_tnl *tnl,
         tnl->ip_ttl = ip6->ip6_hlim;
 
         *hlen += IPV6_HEADER_LEN;
-
-        if (ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt == 60) {
-            VLOG_WARN("XXXX hack");
-            *hlen += 8;
-        }
-            
+        *hlen += netdev_tnl_ip6_exthdr(ip6);
     } else {
         VLOG_WARN_RL(&err_rl, "ipv4 packet has invalid version (%d)",
                      IP_VER(ip->ip_ihl_ver));
@@ -537,7 +556,8 @@ VLOG_WARN("%s hlen %d", __func__, hlen);
     if (!greh) {
         goto err;
     }
-hex_dump(dp_packet_data(packet), 20);
+//    VLOG_WARN("l4 ofs %d", packet->l4_ofs); // 62 or 54
+//    hex_dump(greh, 10);
 /*
 |00723|native_tnl|WARN|netdev_erspan_pop_header ulen 34
 |00724|native_tnl|WARN|netdev_erspan_pop_header hlen 50
@@ -549,9 +569,6 @@ v2
 797|native_tnl|WARN|netdev_erspan_pop_header ulen 54
 799|native_tnl|WARN|netdev_erspan_pop_header hlen 70
 */
-
-
-    VLOG_WARN("%s ulen %d\n", __func__, ulen); // 54 = 40 + 14
 
     greh_protocol = ntohs(greh->protocol);
     if (greh_protocol != ETH_TYPE_ERSPAN1 &&
@@ -569,7 +586,6 @@ v2
 
     if (ersh->ver == 1) {
         ovs_be32 *index;
-VLOG_WARN("erspan v1");
         index = (ovs_be32 *)(ersh + 1);
         tnl->erspan_idx = ntohl(*index);
         tnl->flags |= FLOW_TNL_F_KEY;
@@ -577,6 +593,7 @@ VLOG_WARN("erspan v1");
     } else if (ersh->ver == 2) {
         struct erspan_md2 *md;
 
+VLOG_WARN("erspan v2");
         md = (struct erspan_md2 *)(ersh + 1);
         tnl->erspan_dir = md->dir;
         tnl->erspan_hwid = get_hwid(md);
@@ -592,12 +609,9 @@ VLOG_WARN("erspan v1");
         goto err;
     }
 
-    VLOG_WARN("%s hlen %d\n", __func__, hlen);
-    
-hex_dump(dp_packet_data(packet), 20);
     dp_packet_reset_packet(packet, hlen);
 
-VLOG_WARN("after reset hlen");
+VLOG_WARN("hlen %d", hlen);
 hex_dump(dp_packet_data(packet), 20);
     return packet;
 err:

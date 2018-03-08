@@ -467,9 +467,10 @@ AT_CHECK([ip link set dev br-underlay up])
 dnl Set up tunnel endpoints on OVS outside the namespace and with a native
 dnl linux device inside the namespace.
 ADD_OVS_TUNNEL6([ip6erspan], [br0], [at_erspan0], [fc00:100::1], [10.1.1.100/24],
-                [options:key=321 options:erspan_ver=2 options:erspan_dir=0 options:erspan_hwid=0x17])
+                [options:key=121 options:erspan_ver=2 options:erspan_dir=0 options:erspan_hwid=0x7])
 ADD_NATIVE_TUNNEL6([ip6erspan], [ns_erspan0], [at_ns0], [fc00:100::100],
-                   [10.1.1.1/24], [local fc00:100::1 seq key 321 erspan_ver 2 erspan_dir ingress erspan_hwid 0x17])
+                   [10.1.1.1/24],
+                   [local fc00:100::1 seq key 121 erspan_ver 2 erspan_dir ingress erspan_hwid 0x7])
 
 OVS_WAIT_UNTIL([ip netns exec at_ns0 ping6 -c 2 fc00:100::100])
 
