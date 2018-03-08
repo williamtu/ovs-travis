@@ -125,6 +125,11 @@ netdev_tnl_ip_extract_tnl_md(struct dp_packet *packet, struct flow_tnl *tnl,
 
         *hlen += IPV6_HEADER_LEN;
 
+        if (ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt == 60) {
+            VLOG_WARN("XXXX hack");
+            *hlen += 8;
+        }
+            
     } else {
         VLOG_WARN_RL(&err_rl, "ipv4 packet has invalid version (%d)",
                      IP_VER(ip->ip_ihl_ver));
@@ -501,6 +506,12 @@ netdev_gre_build_header(const struct netdev *netdev,
     return 0;
 }
 
+static void hex_dump(unsigned char *buf, int len)
+{
+        while (len--)
+                VLOG_WARN("%02x", *buf++);
+}
+
 struct dp_packet *
 netdev_erspan_pop_header(struct dp_packet *packet)
 {
@@ -508,14 +519,14 @@ netdev_erspan_pop_header(struct dp_packet *packet)
     const struct erspan_base_hdr *ersh;
     struct pkt_metadata *md = &packet->md;
     struct flow_tnl *tnl = &md->tunnel;
-    int hlen = sizeof(struct eth_header) + 4;
+    int hlen = sizeof(struct eth_header);
     unsigned int ulen;
     uint16_t greh_protocol;
 
     hlen += netdev_tnl_is_header_ipv6(dp_packet_data(packet)) ?
             IPV6_HEADER_LEN : IP_HEADER_LEN;
 
-VLOG_WARN("%s hlen %d\n", __func__, hlen);
+VLOG_WARN("%s hlen %d", __func__, hlen);
 
     pkt_metadata_init_tnl(md);
     if (hlen > dp_packet_size(packet)) {
@@ -526,6 +537,21 @@ VLOG_WARN("%s hlen %d\n", __func__, hlen);
     if (!greh) {
         goto err;
     }
+hex_dump(dp_packet_data(packet), 20);
+/*
+|00723|native_tnl|WARN|netdev_erspan_pop_header ulen 34
+|00724|native_tnl|WARN|netdev_erspan_pop_header hlen 50
+
+v2
+|00723|native_tnl|WARN|netdev_erspan_pop_header ulen 34
+|00724|native_tnl|WARN|netdev_erspan_pop_header hlen 54
+
+797|native_tnl|WARN|netdev_erspan_pop_header ulen 54
+799|native_tnl|WARN|netdev_erspan_pop_header hlen 70
+*/
+
+
+    VLOG_WARN("%s ulen %d\n", __func__, ulen); // 54 = 40 + 14
 
     greh_protocol = ntohs(greh->protocol);
     if (greh_protocol != ETH_TYPE_ERSPAN1 &&
@@ -562,11 +588,17 @@ VLOG_WARN("erspan v1");
     }
 
     if (hlen > dp_packet_size(packet)) {
+        VLOG_WARN("error hlen %d > packet size %d", hlen, dp_packet_size(packet));
         goto err;
     }
 
+    VLOG_WARN("%s hlen %d\n", __func__, hlen);
+    
+hex_dump(dp_packet_data(packet), 20);
     dp_packet_reset_packet(packet, hlen);
 
+VLOG_WARN("after reset hlen");
+hex_dump(dp_packet_data(packet), 20);
     return packet;
 err:
     dp_packet_delete(packet);
