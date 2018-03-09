@@ -712,30 +712,6 @@ format_odp_tnl_push_header(struct ds *ds, struct ovs_action_push_tnl *data)
             options++;
         }
         ds_put_format(ds, ")");
-    } else if (data->tnl_type == OVS_VPORT_TYPE_ERSPAN ||
-               data->tnl_type == OVS_VPORT_TYPE_IP6ERSPAN) {
-        const struct gre_base_hdr *greh;
-        const struct erspan_base_hdr *ersh;
-
-        greh = (const struct gre_base_hdr *) l4;
-        ersh = ERSPAN_HDR(greh);
-
-        if (ersh->ver == 1) {
-            const ovs_be32 *index;
-
-            index = (const ovs_be32 *)(ersh + 1);
-            ds_put_format(ds, "erspan(ver=1,sid=0x%"PRIx16",idx=0x%"PRIx32")",
-                          get_sid(ersh), ntohl(*index));
-        } else if (ersh->ver == 2) {
-            const struct erspan_md2 *md2;
-
-            md2 = (const struct erspan_md2 *)(ersh + 1);
-            ds_put_format(ds, "erspan(ver=2,sid=0x%"PRIx16
-                          ",dir=%"PRIu8",hwid=0x%"PRIx8")",
-                          get_sid(ersh), md2->dir, get_hwid(md2));
-        } else {
-			VLOG_WARN("%s Invalid ERSPAN version %d\n", __func__, ersh->ver);
-		}
     }
     ds_put_format(ds, ")");
 }
@@ -1423,14 +1399,11 @@ ovs_parse_tnl_push(const char *s, struct ovs_action_push_tnl *data)
     struct ovs_16aligned_ip6_hdr *ip6;
     struct udp_header *udp;
     struct gre_base_hdr *greh;
-    struct erspan_base_hdr *ersh;
-    struct erspan_md2 *md2;
-    uint16_t gre_proto, gre_flags, dl_type, udp_src, udp_dst, csum, sid;
+    uint16_t gre_proto, gre_flags, dl_type, udp_src, udp_dst, csum;
     ovs_be32 sip, dip;
-    uint32_t tnl_type = 0, header_len = 0, ip_len = 0, erspan_idx = 0;
+    uint32_t tnl_type = 0, header_len = 0, ip_len = 0;
     void *l3, *l4;
     int n = 0;
-    uint8_t hwid, dir;
 
     if (!ovs_scan_len(s, &n, "tnl_push(tnl_port(%"SCNi32"),", &data->tnl_port)) {
         return -EINVAL;
@@ -1601,58 +1574,6 @@ ovs_parse_tnl_push(const char *s, struct ovs_action_push_tnl *data)
 
         header_len = sizeof *eth + ip_len +
                      ((uint8_t *) options - (uint8_t *) greh);
-    } else if (ovs_scan_len(s, &n, "erspan(ver=1,sid="SCNx16",idx=0x"SCNx32")",
-                            &sid, &erspan_idx)) {
-        ovs_be32 *index;
-
-        ersh = ERSPAN_HDR(greh);
-        index = (ovs_be32 *)(ersh + 1);
-
-        if (eth->eth_type == htons(ETH_TYPE_IP)) {
-            tnl_type = OVS_VPORT_TYPE_ERSPAN;
-        } else {
-            tnl_type = OVS_VPORT_TYPE_IP6ERSPAN;
-        }
-
-        greh->flags = htons(GRE_SEQ);
-        greh->protocol = htons(ETH_TYPE_ERSPAN1);
-
-        ersh->ver = 1;
-        set_sid(ersh, sid);
-        *index = htonl(erspan_idx);
-
-        if (!ovs_scan_len(s, &n, ")")) {
-            return -EINVAL;
-        }
-        header_len = sizeof *eth + ip_len + ERSPAN_GREHDR_LEN +
-                     sizeof *ersh + ERSPAN_V1_MDSIZE;
-
-    } else if (ovs_scan_len(s, &n, "erspan(ver=2,sid="SCNx16"dir="SCNu8
-                            ",hwid=0x"SCNx8")", &sid, &dir, &hwid)) {
-
-        ersh = ERSPAN_HDR(greh);
-        md2 = (struct erspan_md2 *)(ersh + 1);
-
-        if (eth->eth_type == htons(ETH_TYPE_IP)) {
-            tnl_type = OVS_VPORT_TYPE_ERSPAN;
-        } else {
-            tnl_type = OVS_VPORT_TYPE_IP6ERSPAN;
-        }
-
-        greh->flags = htons(GRE_SEQ);
-        greh->protocol = htons(ETH_TYPE_ERSPAN2);
-
-        ersh->ver = 2;
-        set_sid(ersh, sid);
-        set_hwid(md2, hwid);
-        md2->dir = dir;
-
-        if (!ovs_scan_len(s, &n, ")")) {
-            return -EINVAL;
-        }
-
-        header_len = sizeof *eth + ip_len + ERSPAN_GREHDR_LEN +
-                     sizeof *ersh + ERSPAN_V2_MDSIZE;
     } else {
         return -EINVAL;
     }

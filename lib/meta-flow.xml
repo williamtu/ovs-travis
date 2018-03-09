@@ -1456,7 +1456,6 @@ ovs-ofctl add-flow br-int 'in_port=3,tun_src=192.168.1.1,tun_id=5001 actions=1'
 	<li>LISP has a 24-bit instance ID.</li>
 	<li>GRE has an optional 32-bit key.</li>
 	<li>STT has a 64-bit key.</li>
-	<li>ERSPAN has a 10-bit key (Session ID).</li>
       </ul>
 
       <p>
@@ -1714,91 +1713,6 @@ ovs-ofctl add-flow br-int 'in_port=3,tun_src=192.168.1.1,tun_id=5001 actions=1'
           this packet.  Devices must not apply policies when the A bit is set.
         </dd>
       </dl>
-    </field>
-
-    <h2>ERSPAN Metadata Fields FIXME</h2>
-    <p>
-      These fields provide access to features in the ERSPAN tunneling
-      protocol.  The ERSPAN header is defined in the draft <url
-      href="https://tools.ietf.org/html/draft-foschiano-erspan-03"/>
-    </p>
-    <field id="MFF_TUN_ERSPAN_VER" title="ERSPAN Version">
-      <p>
-        ERSPAN version number. 1 for version 1 (type II)
-        or 2 for version 2 (type III).
-      </p>
-    </field>
-
-    <p> ERSPAN version 1 header format:</p>
-    <diagram>
-	  <header name="GRE">
-	    <bits name="..." above="16" width="0.4"/>
-	    <bits name="type" above="16" below="0x88be" width="0.4"/>
-	    <bits name="seq" above="32" width=".4"/>
-	  </header>
-	  <header name="ERSPAN v1">
-	    <bits name="ver" above="4" below="1" width="0.4"/>
-	    <bits name="..." above="18" width="0.4"/>
-	    <bits name="session" above="10" below="tun_id" width="0.4"/>
-	    <bits name="..." above="12" width="0.4"/>
-	    <bits name="idx" above="20" width="0.6"/>
-	  </header>
-	  <header name="Ethernet">
-	    <bits name="dst" above="48" width="0.4"/>
-	    <bits name="src" above="48" width="0.4"/>
-	    <bits name="type" above="16" width="0.4"/>
-	  </header>
-	  <dots/>
-    </diagram>
-
-    <p> ERSPAN has a fixed 8-byte GRE header, including 4-byte GRE base header
-        another 4-byte sequence number.  The ERSPAN's 10-bit session ID holds
-        the tunnel ID.
-    </p>
-    <field id="MFF_TUN_ERSPAN_IDX" title="ERSPAN Index">
-      <p>
-        ERSPAN index is a 20-bit index/port number associated with the ERSPAN
-        traffic's source port and direction (ingress/egress).  This field is
-        platform dependent.
-      </p>
-    </field>
-
-    <p> ERSPAN version 2 header format:</p>
-    <diagram>
-	  <header name="GRE">
-	    <bits name="..." above="16" width="0.4"/>
-	    <bits name="type" above="16" below="0x22eb" width="0.4"/>
-	    <bits name="seq" above="32" width=".4"/>
-	  </header>
-	  <header name="ERSPAN v2">
-	    <bits name="ver" above="4" below="2" width="0.4"/>
-	    <bits name="..." above="18" width="0.4"/>
-	    <bits name="session" above="10" below="tun_id" width="0.4"/>
-	    <bits name="timestamp" above="32" width=".4"/>
-	    <bits name="..." above="22" width="0.4"/>
-	    <bits name="hwid" above="6" width="0.4"/>
-	    <bits name="dir" above="1" below="0/1" width="0.4"/>
-	    <bits name="..." above="3" width="0.4"/>
-	  </header>
-	  <header name="Ethernet">
-	    <bits name="dst" above="48" width="0.4"/>
-	    <bits name="src" above="48" width="0.4"/>
-	    <bits name="type" above="16" width="0.4"/>
-	  </header>
-	  <dots/>
-    </diagram>
-
-    <field id="MFF_TUN_ERSPAN_DIR" title="ERSPAN Direction">
-      <p>
-        Specifies the ERSPAN v2 mirrored traffic's direction.
-        Value 1 for egress traffic, and value 0 for ingress traffic.
-      </p>
-    </field>
-    <field id="MFF_TUN_ERSPAN_HWID" title="ERSPAN Hardware ID">
-      <p>
-        ERSPAN hardware ID is a 6-bit unique identifier of an
-        ERSPAN v2 engine within a system.
-      </p>
     </field>
 
     <h2>Geneve Fields</h2>
