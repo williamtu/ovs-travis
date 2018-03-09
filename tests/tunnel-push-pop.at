@@ -18,7 +18,7 @@ dummy@ovs-dummy: hit:0 missed:0
 		p0 1/1: (dummy)
 	int-br:
 		int-br 65534/2: (dummy-internal)
-		t1 2/3: (erspan: erspan_idx=0x3, erspan_ver=1, key=123, remote_ip=1.1.2.92) 
+		t1 2/3: (erspan: erspan_idx=0x3, erspan_ver=1, key=123, remote_ip=1.1.2.92)
 		t2 3/3: (erspan: erspan_dir=1, erspan_hwid=0x7, erspan_ver=2, key=567, remote_ip=1.1.2.92)
 ])
 
