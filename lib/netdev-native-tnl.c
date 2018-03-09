@@ -569,11 +569,11 @@ netdev_erspan_pop_header(struct dp_packet *packet)
         tnl->flags |= FLOW_TNL_F_KEY;
         hlen = ulen + ERSPAN_GREHDR_LEN + sizeof *ersh + ERSPAN_V1_MDSIZE;
     } else if (ersh->ver == 2) {
-        struct erspan_md2 *md;
+        struct erspan_md2 *md2;
 
-        md = (struct erspan_md2 *)(ersh + 1);
-        tnl->erspan_dir = md->dir;
-        tnl->erspan_hwid = get_hwid(md);
+        md2 = (struct erspan_md2 *)(ersh + 1);
+        tnl->erspan_dir = md2->dir;
+        tnl->erspan_hwid = get_hwid(md2);
         tnl->flags |= FLOW_TNL_F_KEY;
         hlen = ulen + ERSPAN_GREHDR_LEN + sizeof *ersh + ERSPAN_V2_MDSIZE;
     } else {
