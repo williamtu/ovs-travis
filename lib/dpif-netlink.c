@@ -787,7 +787,11 @@ get_vport_type(const struct dpif_netlink_vport *vport)
         return "stt";
 
     case OVS_VPORT_TYPE_ERSPAN:
+        return "erspan";
+
     case OVS_VPORT_TYPE_IP6ERSPAN:
+        return "ip6erspan";
+
     case OVS_VPORT_TYPE_UNSPEC:
     case __OVS_VPORT_TYPE_MAX:
         break;
