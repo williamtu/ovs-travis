@@ -1624,7 +1624,6 @@ ovs_parse_tnl_push(const char *s, struct ovs_action_push_tnl *data)
         if (!ovs_scan_len(s, &n, ")")) {
             return -EINVAL;
         }
-VLOG_WARN("%s ip_len %d\n", __func__, ip_len);
         header_len = sizeof *eth + ip_len + ERSPAN_GREHDR_LEN +
                      sizeof *ersh + ERSPAN_V1_MDSIZE;
 
@@ -4990,9 +4989,6 @@ static void
 erspan_to_attr(struct ofpbuf *a, const void *data_)
 {
     const struct erspan_metadata *md = data_;
-
-VLOG_WARN("%s md->version %d\n", __func__, md->version);
-printf("%s md->version %d\n", __func__, md->version);
 
     nl_msg_put_unspec(a, OVS_TUNNEL_KEY_ATTR_ERSPAN_OPTS, md,
                       sizeof *md);

@@ -95,11 +95,9 @@ tnl_port_init_flow(struct flow *flow, struct eth_addr mac,
     if (IN6_IS_ADDR_V4MAPPED(addr)) {
         flow->dl_type = htons(ETH_TYPE_IP);
         flow->nw_dst = in6_addr_get_mapped_ipv4(addr);
-        VLOG_WARN("XXX %s ip nw_proto %d port %d\n", __func__, nw_proto, tp_port);
     } else {
         flow->dl_type = htons(ETH_TYPE_IPV6);
         flow->ipv6_dst = *addr;
-        VLOG_WARN("XXX %s ipv6 nw_proto %d port %d\n", __func__, nw_proto, tp_port);
     }
 
     flow->nw_proto = nw_proto;
@@ -193,10 +191,8 @@ tnl_port_map_insert(odp_port_t port, ovs_be16 tp_port,
     struct ip_device *ip_dev;
     uint8_t nw_proto;
 
-VLOG_WARN("enter: %s\n", __func__);
     nw_proto = tnl_type_to_nw_proto(type);
     if (!nw_proto) {
-        VLOG_WARN("enter: %s\n", __func__);
         return;
     }
 
@@ -220,7 +216,6 @@ VLOG_WARN("enter: %s\n", __func__);
         map_insert_ipdev__(ip_dev, p->dev_name, p->port, p->nw_proto, p->tp_port);
     }
 
-VLOG_WARN("done enter: %s\n", __func__);
 out:
     ovs_mutex_unlock(&mutex);
 }
@@ -416,23 +411,19 @@ insert_ipdev(const char dev_name[])
     struct netdev *dev;
     int error, n_in6;
 
-VLOG_WARN("XXX %s %s\n", __func__, dev_name);
     error = netdev_open(dev_name, netdev_get_type_from_name(dev_name), &dev);
     if (error) {
-        VLOG_WARN("failed netdev_open");
         return;
     }
 
     error = netdev_get_addr_list(dev, &addr, &mask, &n_in6);
     if (error) {
         netdev_close(dev);
-        VLOG_WARN("failed netdev_get_addr_list error %d\n", error);
         return;
     }
     free(mask);
     insert_ipdev__(dev, addr, n_in6);
     netdev_close(dev);
-VLOG_WARN("XXX done %s %s\n", __func__, dev_name);
 }
 
 static void

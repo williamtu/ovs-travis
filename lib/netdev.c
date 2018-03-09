@@ -806,7 +806,7 @@ netdev_pop_header(struct netdev *netdev, struct dp_packet_batch *batch)
 {
     struct dp_packet *packet;
     size_t i, size = dp_packet_batch_size(batch);
-VLOG_WARN("%s pop header\n", __func__);
+
     DP_PACKET_BATCH_REFILL_FOR_EACH (i, size, packet, batch) {
         packet = netdev->netdev_class->pop_header(packet);
         if (packet) {

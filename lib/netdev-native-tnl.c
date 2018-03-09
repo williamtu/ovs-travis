@@ -73,7 +73,6 @@ netdev_tnl_ip6_exthdr(const struct ovs_16aligned_ip6_hdr *ip6)
     case IPPROTO_HOPOPTS:
     case IPPROTO_ROUTING:
         extlen = (exthdr[1] + 1) << 3;
-        VLOG_WARN("XXX extlen %d", extlen);
         break;
     case IPPROTO_FRAGMENT:
     default:
@@ -149,6 +148,7 @@ netdev_tnl_ip_extract_tnl_md(struct dp_packet *packet, struct flow_tnl *tnl,
 
         *hlen += IPV6_HEADER_LEN;
         *hlen += netdev_tnl_ip6_exthdr(ip6);
+
     } else {
         VLOG_WARN_RL(&err_rl, "ipv4 packet has invalid version (%d)",
                      IP_VER(ip->ip_ihl_ver));
@@ -189,7 +189,6 @@ netdev_tnl_push_ip_header(struct dp_packet *packet,
         *ip_tot_size -= IPV6_HEADER_LEN;
         ip6->ip6_plen = htons(*ip_tot_size);
         packet->l4_ofs = dp_packet_size(packet) - *ip_tot_size;
- VLOG_WARN("%s\n", __func__);
         return ip6 + 1;
     } else {
         ip = netdev_tnl_ip_hdr(eth);
@@ -525,12 +524,6 @@ netdev_gre_build_header(const struct netdev *netdev,
     return 0;
 }
 
-static void hex_dump(unsigned char *buf, int len)
-{
-        while (len--)
-                VLOG_WARN("%02x", *buf++);
-}
-
 struct dp_packet *
 netdev_erspan_pop_header(struct dp_packet *packet)
 {
@@ -545,8 +538,6 @@ netdev_erspan_pop_header(struct dp_packet *packet)
     hlen += netdev_tnl_is_header_ipv6(dp_packet_data(packet)) ?
             IPV6_HEADER_LEN : IP_HEADER_LEN;
 
-VLOG_WARN("%s hlen %d", __func__, hlen);
-
     pkt_metadata_init_tnl(md);
     if (hlen > dp_packet_size(packet)) {
         goto err;
@@ -556,19 +547,6 @@ VLOG_WARN("%s hlen %d", __func__, hlen);
     if (!greh) {
         goto err;
     }
-//    VLOG_WARN("l4 ofs %d", packet->l4_ofs); // 62 or 54
-//    hex_dump(greh, 10);
-/*
-|00723|native_tnl|WARN|netdev_erspan_pop_header ulen 34
-|00724|native_tnl|WARN|netdev_erspan_pop_header hlen 50
-
-v2
-|00723|native_tnl|WARN|netdev_erspan_pop_header ulen 34
-|00724|native_tnl|WARN|netdev_erspan_pop_header hlen 54
-
-797|native_tnl|WARN|netdev_erspan_pop_header ulen 54
-799|native_tnl|WARN|netdev_erspan_pop_header hlen 70
-*/
 
     greh_protocol = ntohs(greh->protocol);
     if (greh_protocol != ETH_TYPE_ERSPAN1 &&
@@ -593,7 +571,6 @@ v2
     } else if (ersh->ver == 2) {
         struct erspan_md2 *md;
 
-VLOG_WARN("erspan v2");
         md = (struct erspan_md2 *)(ersh + 1);
         tnl->erspan_dir = md->dir;
         tnl->erspan_hwid = get_hwid(md);
@@ -605,14 +582,11 @@ VLOG_WARN("erspan v2");
     }
 
     if (hlen > dp_packet_size(packet)) {
-        VLOG_WARN("error hlen %d > packet size %d", hlen, dp_packet_size(packet));
         goto err;
     }
 
     dp_packet_reset_packet(packet, hlen);
 
-VLOG_WARN("hlen %d", hlen);
-hex_dump(dp_packet_data(packet), 20);
     return packet;
 err:
     dp_packet_delete(packet);
