@@ -36,10 +36,12 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/utsname.h>
-#include <netpacket/packet.h>
+//#include <netpacket/packet.h>
 #include <net/if.h>
 #include <net/if_arp.h>
-#include <net/if_packet.h>
+#include <sys/mman.h>
+#include <linux/if_packet.h>
+//#include <net/if_packet.h>
 #include <net/route.h>
 #include <poll.h>
 #include <stdlib.h>
@@ -139,6 +141,33 @@ struct tpacket_auxdata {
     uint16_t tp_vlan_tci;
     uint16_t tp_vlan_tpid;
 };
+
+struct ring {
+        struct iovec *rd;
+        uint8_t *mm_space;
+        size_t mm_len, rd_len;
+        struct sockaddr_ll ll;
+        void (*walk)(int sock, struct ring *ring);
+        int type, rd_num, flen, version, next_avail_block;
+        union {
+                struct tpacket_req  req;
+                struct tpacket_req3 req3;
+        };
+};
+
+struct block_desc {
+        uint32_t version;
+        uint32_t offset_to_priv;
+        struct tpacket_hdr_v1 h1;
+};
+
+union frame_map {
+        void *raw;
+};
+
+//#define __sync_synchronize() barrier()
+
+static unsigned int total_packets, total_bytes;
 
 /* Linux 2.6.27 introduced ethtool_cmd_speed
  *
@@ -504,6 +533,10 @@ struct netdev_linux {
     int tap_fd;
     bool present;               /* If the device is present in the namespace */
     uint64_t tx_dropped;        /* tap device can drop if the iface is down */
+
+	/* AF_PACKET mmap ring */
+	struct ring rx_ring;
+	struct ring tx_ring;
 };
 
 struct netdev_rxq_linux {
@@ -839,6 +872,7 @@ netdev_linux_construct_tap(struct netdev *netdev_)
     const char *name = netdev_->name;
     struct ifreq ifr;
 
+VLOG_WARN("%s", __func__);
     int error = netdev_linux_common_construct(netdev_);
     if (error) {
         return error;
@@ -920,18 +954,160 @@ netdev_linux_rxq_alloc(void)
     return &rx->up;
 }
 
+static void unmmap_ring(int sock, struct ring *ring)
+{
+    VLOG_WARN("XXX %s", __func__);
+    munmap(ring->mm_space, ring->mm_len);
+    free(ring->rd);
+}
+
+static void mmap_ring(int sock, struct ring *ring)
+{
+	int i;
+
+	ring->mm_space = mmap(0, ring->mm_len, PROT_READ | PROT_WRITE,
+			      MAP_SHARED | MAP_LOCKED | MAP_POPULATE, sock, 0);
+	if (ring->mm_space == MAP_FAILED) {
+		VLOG_ERR("mmap %s", ovs_strerror(errno));
+		exit(1);
+	}
+
+	memset(ring->rd, 0, ring->rd_len);
+	for (i = 0; i < ring->rd_num; ++i) {
+		ring->rd[i].iov_base = ring->mm_space + (i * ring->flen);
+		ring->rd[i].iov_len = ring->flen;
+	}
+    VLOG_WARN("mmap ring done");
+}
+
+static void bind_ring(int sock, struct ring *ring, int ifindex)
+{
+	int ret;
+
+    VLOG_WARN("XXX %s ifindex %d", __func__, ifindex);
+
+	ring->ll.sll_family = PF_PACKET;
+	ring->ll.sll_protocol = htons(ETH_P_ALL);
+	ring->ll.sll_ifindex = ifindex; 
+	ring->ll.sll_hatype = 0;
+	ring->ll.sll_pkttype = 0;
+	ring->ll.sll_halen = 0;
+
+	ret = bind(sock, (struct sockaddr *) &ring->ll, sizeof(ring->ll));
+	if (ret == -1) {
+		VLOG_ERR("bind %s", ovs_strerror(errno));
+		exit(1);
+	}
+}
+
+static void __v3_fill(struct ring *ring, unsigned int blocks, int type)
+{
+	if (type == PACKET_RX_RING) {
+		ring->req3.tp_retire_blk_tov = 64;
+		ring->req3.tp_sizeof_priv = 0;
+		ring->req3.tp_feature_req_word = TP_FT_REQ_FILL_RXHASH; // check rxhash
+	}
+	ring->req3.tp_block_size = (1 << 11) * 2;
+	ring->req3.tp_frame_size = (1 << 11); /* 2K */
+	ring->req3.tp_block_nr = blocks;
+
+	ring->req3.tp_frame_nr = ring->req3.tp_block_size /
+				 ring->req3.tp_frame_size *
+				 ring->req3.tp_block_nr;
+
+	ring->mm_len = ring->req3.tp_block_size * ring->req3.tp_block_nr;
+//	ring->walk = walk_v3;
+	ring->rd_num = ring->req3.tp_block_nr;
+	ring->flen = ring->req3.tp_block_size;
+
+	VLOG_WARN("%s block nr %d, block size %d, frame size %d",
+					 __func__,
+					 ring->req3.tp_block_nr,
+					 ring->req3.tp_block_size,
+					 ring->req3.tp_frame_size);
+}
+
+static void setup_ring(int sock, struct ring *ring, int version, int type)
+{
+	int ret = 0;
+	unsigned int blocks = 16;
+
+	/* configuration:
+	   total 16 blocks , each block has 1 page 2 frames
+	*/
+    VLOG_WARN("%s thread id %u", __func__, ovsthread_id_self());
+	ring->type = type;
+	ring->version = version;
+    ring->next_avail_block = 0;
+
+	switch (version) {
+	case TPACKET_V1:
+	case TPACKET_V2:
+		break;
+	case TPACKET_V3:
+		__v3_fill(ring, blocks, type);
+		ret = setsockopt(sock, SOL_PACKET, type, &ring->req3,
+				 sizeof(ring->req3));
+		break;
+	}
+
+	if (ret == -1) {
+		VLOG_ERR("setsockopt  %s", ovs_strerror(errno));
+		exit(1);
+	}
+
+	ring->rd_len = ring->rd_num * sizeof(*ring->rd);
+	ring->rd = malloc(ring->rd_len);
+	if (ring->rd == NULL) {
+		VLOG_ERR("malloc %s", ovs_strerror(errno));
+		exit(1);
+	}
+
+    VLOG_WARN("XXX setup ring done");
+	total_packets = 0;
+	total_bytes = 0;
+}
+
+static int pfsocket(int ver)
+{
+	int ret, sock = socket(PF_PACKET, SOCK_RAW, 0); 
+	if (sock == -1) {
+		perror("socket");
+		exit(1);
+	}
+	ret = setsockopt(sock, SOL_PACKET, PACKET_VERSION, &ver, sizeof(ver));
+	if (ret == -1) {
+		perror("setsockopt");
+		exit(1);
+	}
+
+	return sock;
+}
+
 static int
 netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
 {
     struct netdev_rxq_linux *rx = netdev_rxq_linux_cast(rxq_);
     struct netdev *netdev_ = rx->up.netdev;
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
+	struct ring *ring = &netdev->rx_ring;
+	int ver = TPACKET_V3;
+    int ifindex;
     int error;
 
     ovs_mutex_lock(&netdev->mutex);
+
+    VLOG_WARN("XXX %s", __func__); 
+
     rx->is_tap = is_tap_netdev(netdev_);
     if (rx->is_tap) {
+        VLOG_WARN("XXX tap device"); 
         rx->fd = netdev->tap_fd;
+
+        /* this fd is different from the RAW socket fd,
+         * need to creat antoher one
+         */
+
     } else {
         struct sockaddr_ll sll;
         int ifindex, val;
@@ -946,6 +1122,7 @@ netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
             ARRAY_SIZE(filt), (struct sock_filter *) filt
         };
 
+        VLOG_WARN("XXX create RAW socket", __func__); 
         /* Create file descriptor. */
         rx->fd = socket(PF_PACKET, SOCK_RAW, 0);
         if (rx->fd < 0) {
@@ -953,7 +1130,7 @@ netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
             VLOG_ERR("failed to create raw socket (%s)", ovs_strerror(error));
             goto error;
         }
-
+#if 0
         val = 1;
         if (setsockopt(rx->fd, SOL_PACKET, PACKET_AUXDATA, &val, sizeof val)) {
             error = errno;
@@ -995,7 +1172,29 @@ netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
                      netdev_get_name(netdev_), ovs_strerror(error));
             goto error;
         }
+#endif
+		VLOG_WARN("setup af_packet v3");
+
+		error = setsockopt(rx->fd, SOL_PACKET, PACKET_VERSION, &ver, sizeof(ver));
+		if (error == -1) {
+			VLOG_ERR("setsockopt version %s", ovs_strerror(errno));
+			exit(1);
+		}
+
+		VLOG_WARN("set version done");
+		error = get_ifindex(&netdev->up, &ifindex);
+		if (error) {
+			goto error;
+		}
+
+		/* tools/testing/selftests/net/psock_tpacket.c */
+		memset(ring, 0, sizeof(*ring));
+		setup_ring(rx->fd, ring, TPACKET_V3, PACKET_RX_RING);
+		mmap_ring(rx->fd, ring);
+		bind_ring(rx->fd, ring, ifindex);
+		VLOG_WARN("XXX %s ring config done", __func__);
     }
+
     ovs_mutex_unlock(&netdev->mutex);
 
     return 0;
@@ -1012,8 +1211,11 @@ static void
 netdev_linux_rxq_destruct(struct netdev_rxq *rxq_)
 {
     struct netdev_rxq_linux *rx = netdev_rxq_linux_cast(rxq_);
+    struct netdev *netdev_ = rx->up.netdev;
+    struct ring *rx_ring = &netdev_linux_cast(netdev_)->rx_ring;
 
     if (!rx->is_tap) {
+        unmmap_ring(rx->fd, rx_ring);
         close(rx->fd);
     }
 }
@@ -1044,6 +1246,171 @@ auxdata_has_vlan_tci(const struct tpacket_auxdata *aux)
     return aux->tp_vlan_tci || aux->tp_status & TP_STATUS_VLAN_VALID;
 }
 
+#if 1
+static void test_payload(void *pay, size_t len)
+{
+	struct ethhdr *eth = pay;
+
+	if (len < sizeof(struct ethhdr)) {
+		exit(1);
+	}
+
+	if (eth->h_proto != htons(ETH_P_IP)) {
+		VLOG_WARN("test_payload: wrong ethernet "
+			"type: 0x%x!\n", ntohs(eth->h_proto));
+        // might be ARP 0x0806 or IPv6
+	}
+}
+
+static uint64_t __v3_prev_block_seq_num = 0;
+
+static void __v3_test_block_seq_num(struct block_desc *pbd)
+{
+    // move to per-ring check
+	if (__v3_prev_block_seq_num + 1 != pbd->h1.seq_num) {
+		VLOG_WARN("\nprev_block_seq_num:%"PRIu64", expected "
+			"seq:%"PRIu64" != actual seq:%"PRIu64"\n",
+			__v3_prev_block_seq_num, __v3_prev_block_seq_num + 1,
+			(uint64_t) pbd->h1.seq_num);
+		//exit(1);
+	}
+
+	__v3_prev_block_seq_num = pbd->h1.seq_num;
+}
+
+static void __v3_test_block_len(struct block_desc *pbd, uint32_t bytes, int block_num)
+{
+	if (pbd->h1.num_pkts && bytes != pbd->h1.blk_len) {
+		VLOG_WARN("\nblock:%u with %upackets, expected "
+			"len:%u != actual len:%u\n", block_num,
+			pbd->h1.num_pkts, bytes, pbd->h1.blk_len);
+		//exit(1);
+	}
+}
+
+static void __v3_test_block_header(struct block_desc *pbd, const int block_num)
+{
+	if ((pbd->h1.block_status & TP_STATUS_USER) == 0) {
+		VLOG_WARN("\nblock %u: not in TP_STATUS_USER\n", block_num);
+		//exit(1);
+	}
+
+	__v3_test_block_seq_num(pbd);
+}
+
+static void __v3_flush_block(struct block_desc *pbd)
+{
+	pbd->h1.block_status = TP_STATUS_KERNEL;
+	__sync_synchronize();
+}
+
+#define ALIGN_8(x)              (((x) + 8 - 1) & ~(8 - 1))
+
+static int __v3_walk_block(struct block_desc *pbd, const int block_num,
+                           struct dp_packet_batch *batch)
+{
+	int num_pkts = pbd->h1.num_pkts, i;
+	unsigned long bytes = 0, bytes_with_padding = ALIGN_8(sizeof(*pbd));
+	struct tpacket3_hdr *tp3hdr;
+
+	__v3_test_block_header(pbd, block_num);
+
+	tp3hdr = (struct tpacket3_hdr *) ((uint8_t *) pbd +
+				       pbd->h1.offset_to_first_pkt);
+
+	VLOG_WARN("XXX num_pkts %d\n", num_pkts);
+
+	for (i = 0; i < num_pkts; ++i) {
+        struct dp_packet *packet;
+        void *data;
+
+		bytes += tp3hdr->tp_snaplen;
+
+		if (tp3hdr->tp_next_offset) {
+            //VLOG_WARN("\t next_offset %d", tp3hdr->tp_next_offset);
+			bytes_with_padding += tp3hdr->tp_next_offset;
+        }
+		else
+			bytes_with_padding += ALIGN_8(tp3hdr->tp_snaplen + tp3hdr->tp_mac);
+
+        data = (uint8_t *)tp3hdr + tp3hdr->tp_mac;
+		test_payload(data, tp3hdr->tp_snaplen);
+        
+        packet = dp_packet_clone_data_with_headroom(data, tp3hdr->tp_snaplen,
+                                                    DP_NETDEV_HEADROOM);
+        dp_packet_set_rss_hash(packet, tp3hdr->hv1.tp_rxhash); 
+        dp_packet_batch_add(batch, packet);
+
+        VLOG_WARN("data %p rxhash %x seqno %d",
+                data, tp3hdr->hv1.tp_rxhash, pbd->h1.seq_num);
+        /* next iteration */
+		total_packets++;
+		tp3hdr = (struct tpacket3_hdr *) ((uint8_t *) tp3hdr + tp3hdr->tp_next_offset);
+		__sync_synchronize();
+	}
+
+	__v3_test_block_len(pbd, bytes_with_padding, block_num);
+	total_bytes += bytes;
+
+	return num_pkts;
+}
+
+/* see walk_v3_rx */
+static int
+netdev_linux_rxq_recv_mmap(int fd, struct ring *ring, struct dp_packet_batch *batch)
+{
+	unsigned int block_num = 0;
+	struct pollfd pfd;
+	struct block_desc *pbd;
+
+	memset(&pfd, 0, sizeof(pfd));
+	pfd.fd = fd;
+	pfd.events = POLLIN | POLLERR;
+	pfd.revents = 0;
+
+	/* we can only get max NETDEV_MAX_BURST packets */
+
+	VLOG_WARN("XXX %s next block %d thread id %u fd %d ring %p\n",
+        __func__, ring->next_avail_block, ovsthread_id_self(), fd, ring);
+
+    // not from block 0, need to record last block
+	block_num = ring->next_avail_block;
+    for (;;) {
+		pbd = (struct block_desc *) ring->rd[block_num].iov_base;
+
+		if ((pbd->h1.block_status & TP_STATUS_USER) == 0) {
+            // don't poll: the upper layer already poll
+            //poll(&pfd, 1, 1); /* timeout in 1 ms */
+            // upper layer should poll on the ring fd
+            VLOG_WARN("no packet this time, out block %d", ring->next_avail_block);
+            break;
+        }
+
+		__v3_walk_block(pbd, block_num, batch);
+		__v3_flush_block(pbd);
+
+        ring->next_avail_block = (ring->next_avail_block + 1) % ring->rd_num;
+        block_num = ring->next_avail_block;
+        __sync_synchronize();
+        VLOG_WARN("got packet, next is %d", ring->next_avail_block);
+    }
+//    VLOG_WARN("XXX batch has %lu packet", batch->count);
+/*
+2018-03-19T16:30:25.304Z|00036|netdev_linux|WARN|__v3_fill block nr 16, block size 4096, frame size 2048
+2018-03-19T15:06:56.442Z|00045|netdev_linux|WARN|XXX setup ring done
+2018-03-19T15:06:56.442Z|00046|netdev_linux|WARN|XXX bind_ring ifindex 2
+2018-03-19T15:06:56.442Z|00047|netdev_linux|WARN|XXX netdev_linux_rxq_construct ring config done
+2018-03-19T15:06:56.442Z|00048|bridge|INFO|bridge br0: added interface enp0s16 on port 1
+2018-03-19T15:06:56.443Z|00049|bridge|INFO|bridge br0: using datapath ID 00000050562ef47f
+2018-03-19T15:06:56.443Z|00050|netdev_linux|WARN|XXX netdev_linux_rxq_recv_mmap
+2018-03-19T15:06:57.302Z|00051|netdev_linux|WARN|XXX num_pkts 3
+2018-03-19T15:06:57.369Z|00052|netdev_linux|WARN|XXX num_pkts 2
+2018-03-19T15:07:02.402Z|00053|netdev_linux|WARN|XXX num_pkts 1
+2018-03-19T15:07:02.470Z|00054|netdev_linux|WARN|XXX num_pkts 2
+*/
+}
+
+#endif
 static int
 netdev_linux_rxq_recv_sock(int fd, struct dp_packet *buffer)
 {
@@ -1136,6 +1503,7 @@ netdev_linux_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch)
 {
     struct netdev_rxq_linux *rx = netdev_rxq_linux_cast(rxq_);
     struct netdev *netdev = rx->up.netdev;
+    struct ring *rx_ring = &netdev_linux_cast(netdev)->rx_ring;
     struct dp_packet *buffer;
     ssize_t retval;
     int mtu;
@@ -1149,7 +1517,8 @@ netdev_linux_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch)
                                            DP_NETDEV_HEADROOM);
     retval = (rx->is_tap
               ? netdev_linux_rxq_recv_tap(rx->fd, buffer)
-              : netdev_linux_rxq_recv_sock(rx->fd, buffer));
+              : netdev_linux_rxq_recv_mmap(rx->fd, rx_ring, batch));
+              //: netdev_linux_rxq_recv_sock(rx->fd, buffer));
 
     if (retval) {
         if (retval != EAGAIN && retval != EMSGSIZE) {
@@ -1157,8 +1526,10 @@ netdev_linux_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch)
                          netdev_rxq_get_name(rxq_), ovs_strerror(errno));
         }
         dp_packet_delete(buffer);
-    } else {
+    } else if (rx->is_tap){
         dp_packet_batch_init_packet(batch, buffer);
+    } else {
+        VLOG_WARN("%s receive %lu pkts", __func__, batch->count);
     }
 
     return retval;

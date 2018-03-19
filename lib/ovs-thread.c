@@ -586,6 +586,7 @@ count_cpu_cores(void)
         ovsthread_once_done(&once);
     }
 
+    return 1;
     return n_cores > 0 ? n_cores : 0;
 }
 
