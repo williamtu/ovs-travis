@@ -149,6 +149,7 @@ struct ring {
         struct sockaddr_ll ll;
         void (*walk)(int sock, struct ring *ring);
         int type, rd_num, flen, version, next_avail_block;
+        unsigned long seqno;
         union {
                 struct tpacket_req  req;
                 struct tpacket_req3 req3;
@@ -954,7 +955,7 @@ netdev_linux_rxq_alloc(void)
     return &rx->up;
 }
 
-static void unmmap_ring(int sock, struct ring *ring)
+static void unmmap_ring(int sock OVS_UNUSED, struct ring *ring)
 {
     VLOG_WARN("XXX %s", __func__);
     munmap(ring->mm_space, ring->mm_len);
@@ -1007,7 +1008,8 @@ static void __v3_fill(struct ring *ring, unsigned int blocks, int type)
 		ring->req3.tp_sizeof_priv = 0;
 		ring->req3.tp_feature_req_word = TP_FT_REQ_FILL_RXHASH; // check rxhash
 	}
-	ring->req3.tp_block_size = (1 << 11) * 2;
+	//ring->req3.tp_block_size = (1 << 11) * 2;
+	ring->req3.tp_block_size = (1 << 11) * 16;
 	ring->req3.tp_frame_size = (1 << 11); /* 2K */
 	ring->req3.tp_block_nr = blocks;
 
@@ -1030,7 +1032,8 @@ static void __v3_fill(struct ring *ring, unsigned int blocks, int type)
 static void setup_ring(int sock, struct ring *ring, int version, int type)
 {
 	int ret = 0;
-	unsigned int blocks = 16;
+	//unsigned int blocks = 16;
+	unsigned int blocks = 1;
 
 	/* configuration:
 	   total 16 blocks , each block has 1 page 2 frames
@@ -1039,6 +1042,7 @@ static void setup_ring(int sock, struct ring *ring, int version, int type)
 	ring->type = type;
 	ring->version = version;
     ring->next_avail_block = 0;
+    ring->seqno = 0;
 
 	switch (version) {
 	case TPACKET_V1:
@@ -1092,7 +1096,6 @@ netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
 	struct ring *ring = &netdev->rx_ring;
 	int ver = TPACKET_V3;
-    int ifindex;
     int error;
 
     ovs_mutex_lock(&netdev->mutex);
@@ -1111,7 +1114,9 @@ netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
     } else {
         struct sockaddr_ll sll;
         int ifindex, val;
+
         /* Result of tcpdump -dd inbound */
+        
         static const struct sock_filter filt[] = {
             { 0x28, 0, 0, 0xfffff004 }, /* ldh [0] */
             { 0x15, 0, 1, 0x00000004 }, /* jeq #4     jt 2  jf 3 */
@@ -1121,8 +1126,8 @@ netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
         static const struct sock_fprog fprog = {
             ARRAY_SIZE(filt), (struct sock_filter *) filt
         };
-
-        VLOG_WARN("XXX create RAW socket", __func__); 
+        
+        VLOG_WARN("XXX %s create RAW socket", __func__); 
         /* Create file descriptor. */
         rx->fd = socket(PF_PACKET, SOCK_RAW, 0);
         if (rx->fd < 0) {
@@ -1130,6 +1135,16 @@ netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
             VLOG_ERR("failed to create raw socket (%s)", ovs_strerror(error));
             goto error;
         }
+        /* Filter for only inbound packets. */
+        error = setsockopt(rx->fd, SOL_SOCKET, SO_ATTACH_FILTER, &fprog,
+                           sizeof fprog);
+        if (error) {
+            error = errno;
+            VLOG_ERR("%s: failed to attach filter (%s)",
+                     netdev_get_name(netdev_), ovs_strerror(error));
+            goto error;
+        }
+
 #if 0
         val = 1;
         if (setsockopt(rx->fd, SOL_PACKET, PACKET_AUXDATA, &val, sizeof val)) {
@@ -1262,20 +1277,18 @@ static void test_payload(void *pay, size_t len)
 	}
 }
 
-static uint64_t __v3_prev_block_seq_num = 0;
-
-static void __v3_test_block_seq_num(struct block_desc *pbd)
+static void __v3_test_block_seq_num(struct block_desc *pbd, struct ring *ring)
 {
     // move to per-ring check
-	if (__v3_prev_block_seq_num + 1 != pbd->h1.seq_num) {
+	if (ring->seqno + 1 != pbd->h1.seq_num) {
 		VLOG_WARN("\nprev_block_seq_num:%"PRIu64", expected "
 			"seq:%"PRIu64" != actual seq:%"PRIu64"\n",
-			__v3_prev_block_seq_num, __v3_prev_block_seq_num + 1,
+			ring->seqno, ring->seqno + 1,
 			(uint64_t) pbd->h1.seq_num);
 		//exit(1);
 	}
 
-	__v3_prev_block_seq_num = pbd->h1.seq_num;
+	ring->seqno = pbd->h1.seq_num;
 }
 
 static void __v3_test_block_len(struct block_desc *pbd, uint32_t bytes, int block_num)
@@ -1295,7 +1308,12 @@ static void __v3_test_block_header(struct block_desc *pbd, const int block_num)
 		//exit(1);
 	}
 
-	__v3_test_block_seq_num(pbd);
+}
+
+static void hex_dump(unsigned char *buf, int len)
+{
+        while (len--)
+                VLOG_WARN("%02x", *buf++);
 }
 
 static void __v3_flush_block(struct block_desc *pbd)
@@ -1335,13 +1353,14 @@ static int __v3_walk_block(struct block_desc *pbd, const int block_num,
 
         data = (uint8_t *)tp3hdr + tp3hdr->tp_mac;
 		test_payload(data, tp3hdr->tp_snaplen);
-        
+       
+		ovs_hex_dump(stdout, data, 40, 0, false); 
         packet = dp_packet_clone_data_with_headroom(data, tp3hdr->tp_snaplen,
                                                     DP_NETDEV_HEADROOM);
-        dp_packet_set_rss_hash(packet, tp3hdr->hv1.tp_rxhash); 
+//        dp_packet_set_rss_hash(packet, tp3hdr->hv1.tp_rxhash); 
         dp_packet_batch_add(batch, packet);
 
-        VLOG_WARN("data %p rxhash %x seqno %d",
+        VLOG_WARN("data %p rxhash %x seqno %llu",
                 data, tp3hdr->hv1.tp_rxhash, pbd->h1.seq_num);
         /* next iteration */
 		total_packets++;
@@ -1353,6 +1372,14 @@ static int __v3_walk_block(struct block_desc *pbd, const int block_num,
 	total_bytes += bytes;
 
 	return num_pkts;
+}
+
+static void vlog_hex_dump(const uint8_t *buf, size_t count)                          
+{                                                                               
+   struct ds ds = DS_EMPTY_INITIALIZER;                                        
+   ds_put_hex_dump(&ds, buf, count, 0, false);                                 
+   VLOG_INFO("\n%s", ds_cstr(&ds));                                            
+   ds_destroy(&ds);                                                            
 }
 
 /* see walk_v3_rx */
@@ -1369,10 +1396,10 @@ netdev_linux_rxq_recv_mmap(int fd, struct ring *ring, struct dp_packet_batch *ba
 	pfd.revents = 0;
 
 	/* we can only get max NETDEV_MAX_BURST packets */
-
 	VLOG_WARN("XXX %s next block %d thread id %u fd %d ring %p\n",
         __func__, ring->next_avail_block, ovsthread_id_self(), fd, ring);
 
+    dp_packet_batch_init(batch);
     // not from block 0, need to record last block
 	block_num = ring->next_avail_block;
     for (;;) {
@@ -1388,12 +1415,18 @@ netdev_linux_rxq_recv_mmap(int fd, struct ring *ring, struct dp_packet_batch *ba
 
 		__v3_walk_block(pbd, block_num, batch);
 		__v3_flush_block(pbd);
+	    __v3_test_block_seq_num(pbd, ring);
 
         ring->next_avail_block = (ring->next_avail_block + 1) % ring->rd_num;
         block_num = ring->next_avail_block;
         __sync_synchronize();
         VLOG_WARN("got packet, next is %d", ring->next_avail_block);
     }
+
+    dp_packet_batch_init_packet_fields(batch);
+
+VLOG_WARN("total packet %u", total_packets);
+    return 0;
 //    VLOG_WARN("XXX batch has %lu packet", batch->count);
 /*
 2018-03-19T16:30:25.304Z|00036|netdev_linux|WARN|__v3_fill block nr 16, block size 4096, frame size 2048
