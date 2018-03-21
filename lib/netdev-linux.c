@@ -538,6 +538,7 @@ struct netdev_linux {
 	/* AF_PACKET mmap ring */
 	struct ring rx_ring;
 	struct ring tx_ring;
+	int tx_fd;
 };
 
 struct netdev_rxq_linux {
@@ -833,6 +834,8 @@ netdev_linux_common_construct(struct netdev *netdev_)
     return 0;
 }
 
+//static int setup_tx_mmap(struct netdev *netdev_);
+
 /* Creates system and internal devices. */
 static int
 netdev_linux_construct(struct netdev *netdev_)
@@ -1008,8 +1011,7 @@ static void __v3_fill(struct ring *ring, unsigned int blocks, int type)
 		ring->req3.tp_sizeof_priv = 0;
 		ring->req3.tp_feature_req_word = TP_FT_REQ_FILL_RXHASH; // check rxhash
 	}
-	//ring->req3.tp_block_size = (1 << 11) * 2;
-	ring->req3.tp_block_size = (1 << 11) * 16;
+	ring->req3.tp_block_size = (1 << 11) * 2;
 	ring->req3.tp_frame_size = (1 << 11); /* 2K */
 	ring->req3.tp_block_nr = blocks;
 
@@ -1032,8 +1034,7 @@ static void __v3_fill(struct ring *ring, unsigned int blocks, int type)
 static void setup_ring(int sock, struct ring *ring, int version, int type)
 {
 	int ret = 0;
-	//unsigned int blocks = 16;
-	unsigned int blocks = 1;
+	unsigned int blocks = 16;
 
 	/* configuration:
 	   total 16 blocks , each block has 1 page 2 frames
@@ -1074,7 +1075,7 @@ static void setup_ring(int sock, struct ring *ring, int version, int type)
 
 static int pfsocket(int ver)
 {
-	int ret, sock = socket(PF_PACKET, SOCK_RAW, 0); 
+	int ret, sock = socket(PF_PACKET, SOCK_RAW, 0);
 	if (sock == -1) {
 		perror("socket");
 		exit(1);
@@ -1094,17 +1095,18 @@ netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
     struct netdev_rxq_linux *rx = netdev_rxq_linux_cast(rxq_);
     struct netdev *netdev_ = rx->up.netdev;
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
-	struct ring *ring = &netdev->rx_ring;
+	struct ring *rx_ring = &netdev->rx_ring;
+	struct ring *tx_ring = &netdev->tx_ring;
 	int ver = TPACKET_V3;
     int error;
 
     ovs_mutex_lock(&netdev->mutex);
 
-    VLOG_WARN("XXX %s", __func__); 
+    VLOG_WARN("XXX %s", __func__);
 
     rx->is_tap = is_tap_netdev(netdev_);
     if (rx->is_tap) {
-        VLOG_WARN("XXX tap device"); 
+        VLOG_WARN("XXX tap device");
         rx->fd = netdev->tap_fd;
 
         /* this fd is different from the RAW socket fd,
@@ -1116,7 +1118,6 @@ netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
         int ifindex, val;
 
         /* Result of tcpdump -dd inbound */
-        
         static const struct sock_filter filt[] = {
             { 0x28, 0, 0, 0xfffff004 }, /* ldh [0] */
             { 0x15, 0, 1, 0x00000004 }, /* jeq #4     jt 2  jf 3 */
@@ -1126,8 +1127,7 @@ netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
         static const struct sock_fprog fprog = {
             ARRAY_SIZE(filt), (struct sock_filter *) filt
         };
-        
-        VLOG_WARN("XXX %s create RAW socket", __func__); 
+        VLOG_WARN("XXX %s create RAW socket", __func__);
         /* Create file descriptor. */
         rx->fd = socket(PF_PACKET, SOCK_RAW, 0);
         if (rx->fd < 0) {
@@ -1203,10 +1203,10 @@ netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
 		}
 
 		/* tools/testing/selftests/net/psock_tpacket.c */
-		memset(ring, 0, sizeof(*ring));
-		setup_ring(rx->fd, ring, TPACKET_V3, PACKET_RX_RING);
-		mmap_ring(rx->fd, ring);
-		bind_ring(rx->fd, ring, ifindex);
+		memset(rx_ring, 0, sizeof(*rx_ring));
+		setup_ring(rx->fd, rx_ring, TPACKET_V3, PACKET_RX_RING);
+		mmap_ring(rx->fd, rx_ring);
+		bind_ring(rx->fd, rx_ring, ifindex);
 		VLOG_WARN("XXX %s ring config done", __func__);
     }
 
@@ -1409,7 +1409,6 @@ netdev_linux_rxq_recv_mmap(int fd, struct ring *ring, struct dp_packet_batch *ba
             // don't poll: the upper layer already poll
             //poll(&pfd, 1, 1); /* timeout in 1 ms */
             // upper layer should poll on the ring fd
-            VLOG_WARN("no packet this time, out block %d", ring->next_avail_block);
             break;
         }
 
@@ -1420,12 +1419,10 @@ netdev_linux_rxq_recv_mmap(int fd, struct ring *ring, struct dp_packet_batch *ba
         ring->next_avail_block = (ring->next_avail_block + 1) % ring->rd_num;
         block_num = ring->next_avail_block;
         __sync_synchronize();
-        VLOG_WARN("got packet, next is %d", ring->next_avail_block);
     }
 
     dp_packet_batch_init_packet_fields(batch);
 
-VLOG_WARN("total packet %u", total_packets);
     return 0;
 //    VLOG_WARN("XXX batch has %lu packet", batch->count);
 /*
@@ -1593,6 +1590,76 @@ netdev_linux_rxq_drain(struct netdev_rxq *rxq_)
     }
 }
 
+#if 1
+static inline void *get_next_frame(struct ring *ring, int n)
+{
+	uint8_t *f0 = ring->rd[0].iov_base;
+
+	return f0 + (n * ring->req3.tp_frame_size);
+}
+
+static inline int __v3_tx_kernel_ready(struct tpacket3_hdr *hdr)
+{
+	return !(hdr->tp_status & (TP_STATUS_SEND_REQUEST | TP_STATUS_SENDING));
+}
+
+static inline void __v3_tx_user_ready(struct tpacket3_hdr *hdr)
+{
+	hdr->tp_status = TP_STATUS_SEND_REQUEST;
+	__sync_synchronize();
+}
+
+static int
+netdev_linux_sock_mmap_send(struct netdev_linux *netdev,
+				struct dp_packet_batch *batch)
+{
+	int ret;
+	unsigned int frame_num;
+	int nframes;
+    struct dp_packet *packet;
+	struct ring *ring = &netdev->tx_ring;
+
+	nframes = ring->req3.tp_frame_nr;
+	frame_num = ring->next_avail_block;
+
+	VLOG_WARN("%s num_pkt to send %lu on frame %u", __func__, batch->count, frame_num);
+
+    DP_PACKET_BATCH_FOR_EACH (i, packet, batch) {
+		struct tpacket3_hdr *tx;
+		void *next = get_next_frame(ring, frame_num);
+
+		// block until next tx frame ready
+		while (!__v3_tx_kernel_ready(next)) {
+			VLOG_WARN("%s waiting for kernel to send", __func__);
+		}
+
+		tx = next;
+		tx->tp_snaplen = dp_packet_size(packet);
+		tx->tp_len = dp_packet_size(packet);
+		tx->tp_next_offset = 0;
+
+		memcpy((uint8_t *)tx + TPACKET3_HDRLEN -
+			   sizeof(struct sockaddr_ll),
+			   dp_packet_data(packet),
+			   dp_packet_size(packet));
+
+		total_bytes += tx->tp_snaplen;
+		__v3_tx_user_ready(next);
+
+		ring->next_avail_block = (ring->next_avail_block + 1) % nframes;
+		frame_num = ring->next_avail_block;
+	}
+
+	ret = sendto(netdev->tx_fd, NULL, 0, 0, NULL, 0);
+	if (ret == -1) {
+		VLOG_INFO("%s", ovs_strerror(errno));
+	}
+
+	VLOG_WARN("done");
+	return 0;
+}
+#endif
+
 static int
 netdev_linux_sock_batch_send(int sock, int ifindex,
                              struct dp_packet_batch *batch)
@@ -1683,6 +1750,59 @@ netdev_linux_tap_batch_send(struct netdev *netdev_,
     return 0;
 }
 
+//setup_tx_mmap(struct netdev *netdev_)
+static int
+netdev_linux_set_tx_multiq(struct netdev *netdev_, unsigned int n_txq)
+{
+	struct netdev_linux *netdev = netdev_linux_cast(netdev_);
+	struct ring *tx_ring = &netdev->tx_ring;
+	int ifindex = netdev_get_ifindex(netdev_);
+	int ver = TPACKET_V3;
+	int sock, error;
+
+    if (is_tap_netdev(netdev_)) {
+		return 0;
+	}
+
+	VLOG_WARN("%s %s ", __func__, netdev_->name);
+
+    if (netdev->tx_fd) {
+        VLOG_INFO("\t already set");
+        return 0;
+    }
+
+    sock = socket(AF_PACKET, SOCK_RAW, 0);
+	if (sock < 0) {
+		error = -sock;
+		goto err;
+	}
+
+	netdev->tx_fd = sock;
+
+	// need to setup this socket
+	error = setsockopt(sock, SOL_PACKET, PACKET_VERSION, &ver, sizeof(ver));
+	if (error < 0) {
+		VLOG_ERR("set packet version: %s", ovs_strerror(errno));
+		goto err;
+	}
+
+	if (ifindex < 0) {
+		error = -ifindex;
+		goto err;
+	}
+
+	memset(tx_ring, 0, sizeof(*tx_ring));
+	setup_ring(sock, tx_ring, TPACKET_V3, PACKET_TX_RING);
+	mmap_ring(sock, tx_ring);
+	bind_ring(sock, tx_ring, ifindex);
+	VLOG_WARN("XXX %s ring config done, sock %d ifindex %d",
+			 __func__, sock, ifindex);
+
+	return 0;
+err:
+	return error;
+}
+
 /* Sends 'batch' on 'netdev'.  Returns 0 if successful, otherwise a positive
  * errno value.  Returns EAGAIN without blocking if the packet cannot be queued
  * immediately.  Returns EMSGSIZE if a partial packet was transmitted or if
@@ -1696,22 +1816,22 @@ netdev_linux_send(struct netdev *netdev_, int qid OVS_UNUSED,
                   bool concurrent_txq OVS_UNUSED)
 {
     int error = 0;
-    int sock = 0;
 
     if (!is_tap_netdev(netdev_)) {
-        sock = af_packet_sock();
-        if (sock < 0) {
-            error = -sock;
+		struct netdev_linux *netdev = netdev_linux_cast(netdev_);
+#if 0
+		int ifindex = netdev_get_ifindex(netdev_);
+
+		if (ifindex < 0) {
+        	error = -ifindex;
             goto free_batch;
         }
 
-        int ifindex = netdev_get_ifindex(netdev_);
-        if (ifindex < 0) {
-            error = -ifindex;
-            goto free_batch;
-        }
-
-        error = netdev_linux_sock_batch_send(sock, ifindex, batch);
+		sock = netdev->tx_fd;
+        //error = netdev_linux_sock_batch_send(sock, ifindex, batch);
+#endif
+		VLOG_WARN("send to %s", netdev_->name);
+        error = netdev_linux_sock_mmap_send(netdev, batch);
     } else {
         error = netdev_linux_tap_batch_send(netdev_, batch);
     }
@@ -3262,7 +3382,7 @@ netdev_linux_update_flags(struct netdev *netdev_, enum netdev_flags off,
     NULL,                       /* push header */               \
     NULL,                       /* pop header */                \
     NULL,                       /* get_numa_id */               \
-    NULL,                       /* set_tx_multiq */             \
+    netdev_linux_set_tx_multiq,       /* set_tx_multiq */             \
                                                                 \
     netdev_linux_send,                                          \
     netdev_linux_send_wait,                                     \
