@@ -1009,7 +1009,8 @@ static void __v3_fill(struct ring *ring, unsigned int blocks, int type)
 		ring->req3.tp_sizeof_priv = 0;
 		ring->req3.tp_feature_req_word = TP_FT_REQ_FILL_RXHASH; // check rxhash
 	}
-	ring->req3.tp_block_size = (1 << 22);
+
+    ring->req3.tp_block_size = (1 << 11) * 16;
 	ring->req3.tp_frame_size = (1 << 11); /* 2K */
 	ring->req3.tp_block_nr = blocks;
 
@@ -1096,6 +1097,7 @@ netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
 	struct ring *tx_ring = &netdev->tx_ring;
 	int ver = TPACKET_V3;
     int error;
+    int noqdisc = 1;
 
     ovs_mutex_lock(&netdev->mutex);
 
@@ -1205,6 +1207,8 @@ netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
 		mmap_ring(rx->fd, rx_ring);
 		bind_ring(rx->fd, rx_ring, ifindex);
 		VLOG_WARN("XXX %s ring config done", __func__);
+        error = setsockopt(rx->fd, SOL_PACKET, PACKET_QDISC_BYPASS,
+             &noqdisc, sizeof(noqdisc));
     }
 
     ovs_mutex_unlock(&netdev->mutex);
@@ -1328,7 +1332,7 @@ static int __v3_walk_block(struct block_desc *pbd, const int block_num,
 	unsigned long bytes = 0, bytes_with_padding = ALIGN_8(sizeof(*pbd));
 	struct tpacket3_hdr *tp3hdr;
 
-	__v3_test_block_header(pbd, block_num);
+//	__v3_test_block_header(pbd, block_num);
 
 	tp3hdr = (struct tpacket3_hdr *) ((uint8_t *) pbd +
 				       pbd->h1.offset_to_first_pkt);
@@ -1362,7 +1366,7 @@ static int __v3_walk_block(struct block_desc *pbd, const int block_num,
 		__sync_synchronize();
 	}
 
-	__v3_test_block_len(pbd, bytes_with_padding, block_num);
+	//__v3_test_block_len(pbd, bytes_with_padding, block_num);
 
 	return num_pkts;
 }
@@ -1568,11 +1572,11 @@ netdev_linux_rxq_drain(struct netdev_rxq *rxq_)
 }
 
 #if 1
-static inline void *get_next_frame(struct ring *ring, int n)
+static inline void *get_next_frame(struct ring *ring, int frame)
 {
 	uint8_t *f0 = ring->rd[0].iov_base;
 
-	return f0 + (n * ring->req3.tp_frame_size);
+	return f0 + (frame * ring->req3.tp_frame_size);
 }
 
 static inline int __v3_tx_kernel_ready(struct tpacket3_hdr *hdr)
@@ -1599,14 +1603,17 @@ netdev_linux_sock_mmap_send(struct netdev_linux *netdev,
 	nframes = ring->req3.tp_frame_nr;
 	frame_num = ring->next_avail_block;
 
-	//VLOG_WARN("%s num_pkt to send %lu on frame %u", __func__, batch->count, frame_num);
+//	VLOG_WARN_RL(&rl, "%s %s num_pkt to send %lu on frame %u",
+//        __func__, netdev->up.name, batch->count, frame_num);
 
     DP_PACKET_BATCH_FOR_EACH (i, packet, batch) {
 		struct tpacket3_hdr *tx;
 		void *next = get_next_frame(ring, frame_num);
 
 		// block until next tx frame ready
-		while (!__v3_tx_kernel_ready(next));
+		while (OVS_UNLIKELY(!__v3_tx_kernel_ready(next))) {
+            VLOG_WARN("blocking: waiting for kernel to send");
+        }
 
 		tx = next;
 		tx->tp_snaplen = dp_packet_size(packet);
@@ -1621,11 +1628,12 @@ netdev_linux_sock_mmap_send(struct netdev_linux *netdev,
 		total_bytes += tx->tp_snaplen;
 		__v3_tx_user_ready(next);
 
-		ring->next_avail_block = (ring->next_avail_block + 1) % nframes;
-		frame_num = ring->next_avail_block;
+	    ring->next_avail_block = (ring->next_avail_block + 1) % ring->req3.tp_frame_nr;
+        frame_num = ring->next_avail_block;
 	}
 
-	ret = sendto(netdev->tx_fd, NULL, 0, 0, NULL, 0);
+
+	ret = sendto(netdev->tx_fd, NULL, 0, MSG_DONTWAIT, NULL, 0);
 	if (ret == -1) {
 		VLOG_ERR("%s", ovs_strerror(errno));
 	}
@@ -1733,6 +1741,7 @@ netdev_linux_set_tx_multiq(struct netdev *netdev_, unsigned int n_txq)
 	int ifindex = netdev_get_ifindex(netdev_);
 	int ver = TPACKET_V3;
 	int sock, error;
+    int noqdisc = 1;
 
     if (is_tap_netdev(netdev_)) {
 		return 0;
@@ -1771,6 +1780,8 @@ netdev_linux_set_tx_multiq(struct netdev *netdev_, unsigned int n_txq)
 	bind_ring(sock, tx_ring, ifindex);
 	VLOG_WARN("XXX %s ring config done, sock %d ifindex %d",
 			 __func__, sock, ifindex);
+    setsockopt(sock, SOL_PACKET, PACKET_QDISC_BYPASS,
+             &noqdisc, sizeof(noqdisc));
 
 	return 0;
 err:
