@@ -59,19 +59,49 @@
  *
  * All nodes linked together on a chain have exactly the same hash value. */
 struct cmap_node {
-    OVSRCU_TYPE(struct cmap_node *) next; /* Next node with same hash. */
+    OVSRCU_TYPE(struct cmap_node __rcu *) next; /* Next node with same hash. */
 };
 
-static inline struct cmap_node *
-cmap_node_next(const struct cmap_node *node)
+#define BUILD_ASSERT_TYPE(POINTER, TYPE) \
+    ((void) sizeof ((int) ((POINTER) == (TYPE) (POINTER))))
+
+/* Casts 'pointer' to 'type' and issues a compiler warning if the cast changes
+ * anything other than an outermost "const" or "volatile" qualifier. */
+#define CONST_CAST(TYPE, POINTER)                               \
+    (BUILD_ASSERT_TYPE(POINTER, TYPE),                          \
+     (TYPE) (POINTER))
+/*
+#define atomic_read(SRC, DST) atomic_read_locked(SRC, DST)
+#define atomic_read_explicit(SRC, DST, ORDER)   \
+    ((void) (ORDER), atomic_read(SRC, DST))
+*/
+
+#define atomic_read_locked(SRC, DST)            \
+     (*(DST) = *(SRC))                           \
+
+static inline struct cmap_node __rcu *
+cmap_node_next(const struct cmap_node __rcu *node)
 {
-    return ovsrcu_get(struct cmap_node *, &node->next);
+	struct cmap_node __rcu *value__;
+	typeof(&node->next) ovsrcu_var = &node->next; 
+
+//	value__ = ovsrcu_var->p;
+
+//	memcpy(&value__, (struct cmap_node __rcu **)&ovsrcu_var->p), 1);	
+	//atomic_read_explicit(
+	atomic_read_locked(
+		(&ovsrcu_var->p),
+                             &value__);
+//					memory_order_consume);
+
+    return value__;  
+//    return ovsrcu_get(struct cmap_node __rcu *, &node->next);
 }
 
-static inline struct cmap_node *
-cmap_node_next_protected(const struct cmap_node *node)
+static inline struct cmap_node __rcu *
+cmap_node_next_protected(const struct cmap_node __rcu *node)
 {
-    return ovsrcu_get_protected(struct cmap_node *, &node->next);
+    return ovsrcu_get_protected(struct cmap_node __rcu *, &node->next);
 }
 
 /* Concurrent hash map. */
@@ -94,11 +124,11 @@ size_t cmap_count(const struct cmap *);
 bool cmap_is_empty(const struct cmap *);
 
 /* Insertion and deletion.  Return the current count after the operation. */
-size_t cmap_insert(struct cmap *, struct cmap_node *, uint32_t hash);
-static inline size_t cmap_remove(struct cmap *, struct cmap_node *,
+size_t cmap_insert(struct cmap *, struct cmap_node __rcu *, uint32_t hash);
+static inline size_t cmap_remove(struct cmap *, struct cmap_node __rcu *,
                                  uint32_t hash);
-size_t cmap_replace(struct cmap *, struct cmap_node *old_node,
-                    struct cmap_node *new_node, uint32_t hash);
+size_t cmap_replace(struct cmap *, struct cmap_node __rcu *old_node,
+                    struct cmap_node __rcu *new_node, uint32_t hash);
 
 /* Search.
  *
@@ -142,8 +172,8 @@ size_t cmap_replace(struct cmap *, struct cmap_node *old_node,
 #define CMAP_FOR_EACH_WITH_HASH_PROTECTED(NODE, MEMBER, HASH, CMAP)     \
     CMAP_NODE_FOR_EACH_PROTECTED(NODE, MEMBER, cmap_find_protected(CMAP, HASH))
 
-const struct cmap_node *cmap_find(const struct cmap *, uint32_t hash);
-struct cmap_node *cmap_find_protected(const struct cmap *, uint32_t hash);
+const struct cmap_node __rcu *cmap_find(const struct cmap *, uint32_t hash);
+struct cmap_node __rcu *cmap_find_protected(const struct cmap *, uint32_t hash);
 
 /* Looks up multiple 'hashes', when the corresponding bit in 'map' is 1,
  * and sets the corresponding pointer in 'nodes', if the hash value was
@@ -155,7 +185,7 @@ struct cmap_node *cmap_find_protected(const struct cmap *, uint32_t hash);
  * hash collisions. */
 unsigned long cmap_find_batch(const struct cmap *cmap, unsigned long map,
                               uint32_t hashes[],
-                              const struct cmap_node *nodes[]);
+                              const struct cmap_node __rcu *nodes[]);
 
 /* Iteration.
  *
@@ -226,7 +256,7 @@ struct cmap_cursor {
     const struct cmap_impl *impl;
     uint32_t bucket_idx;
     int entry_idx;
-    struct cmap_node *node;
+    struct cmap_node __rcu *node;
 };
 
 struct cmap_cursor cmap_cursor_start(const struct cmap *);
@@ -246,7 +276,7 @@ void cmap_cursor_advance(struct cmap_cursor *);
           CMAP_FOR_EACH__(NODE, MEMBER, CMAP, \
                 CURSOR_JOIN(cursor_, __COUNTER__))
 
-static inline struct cmap_node *cmap_first(const struct cmap *);
+static inline struct cmap_node __rcu *cmap_first(const struct cmap *);
 
 /* Another, less preferred, form of iteration, for use in situations where it
  * is difficult to maintain a pointer to a cmap_node. */
@@ -256,12 +286,12 @@ struct cmap_position {
     unsigned int offset;
 };
 
-struct cmap_node *cmap_next_position(const struct cmap *,
+struct cmap_node __rcu *cmap_next_position(const struct cmap *,
                                      struct cmap_position *);
 
 /* Returns the first node in 'cmap', in arbitrary order, or a null pointer if
  * 'cmap' is empty. */
-static inline struct cmap_node *
+static inline struct cmap_node __rcu *
 cmap_first(const struct cmap *cmap)
 {
     struct cmap_position pos = { 0, 0, 0 };
@@ -279,7 +309,7 @@ cmap_first(const struct cmap *cmap)
  *
  * Returns the current number of nodes in the cmap after the removal. */
 static inline size_t
-cmap_remove(struct cmap *cmap, struct cmap_node *node, uint32_t hash)
+cmap_remove(struct cmap *cmap, struct cmap_node __rcu *node, uint32_t hash)
 {
     return cmap_replace(cmap, node, NULL, hash);
 }

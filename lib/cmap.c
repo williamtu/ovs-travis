@@ -314,23 +314,23 @@ counter_changed(const struct cmap_bucket *b_, uint32_t c)
     return OVS_UNLIKELY(counter != c);
 }
 
-static inline const struct cmap_node *
+static inline const struct cmap_node __rcu *
 cmap_find_in_bucket(const struct cmap_bucket *bucket, uint32_t hash)
 {
     for (int i = 0; i < CMAP_K; i++) {
         if (bucket->hashes[i] == hash) {
-            return cmap_node_next(&bucket->nodes[i]);
+            return cmap_node_next((const struct cmap_node __rcu *)&bucket->nodes[i]);
         }
     }
     return NULL;
 }
 
-static inline const struct cmap_node *
+static inline const struct cmap_node __rcu *
 cmap_find__(const struct cmap_bucket *b1, const struct cmap_bucket *b2,
             uint32_t hash)
 {
     uint32_t c1, c2;
-    const struct cmap_node *node;
+    const struct cmap_node __rcu *node;
 
     do {
         do {
@@ -361,7 +361,7 @@ cmap_find__(const struct cmap_bucket *b1, const struct cmap_bucket *b2,
  * not changing, then cmap_find_protected() is slightly faster.
  *
  * CMAP_FOR_EACH_WITH_HASH is usually more convenient. */
-const struct cmap_node *
+const struct cmap_node __rcu *
 cmap_find(const struct cmap *cmap, uint32_t hash)
 {
     const struct cmap_impl *impl = cmap_get_impl(cmap);
@@ -383,7 +383,7 @@ cmap_find(const struct cmap *cmap, uint32_t hash)
  * hash collisions. */
 unsigned long
 cmap_find_batch(const struct cmap *cmap, unsigned long map,
-                uint32_t hashes[], const struct cmap_node *nodes[])
+                uint32_t hashes[], const struct cmap_node __rcu * nodes[])
 {
     const struct cmap_impl *impl = cmap_get_impl(cmap);
     unsigned long result = map;
@@ -403,7 +403,7 @@ cmap_find_batch(const struct cmap *cmap, unsigned long map,
     ULLONG_FOR_EACH_1(i, map) {
         uint32_t c1;
         const struct cmap_bucket *b1 = b1s[i];
-        const struct cmap_node *node;
+        const struct cmap_node __rcu *node;
 
         do {
             c1 = read_even_counter(b1);
@@ -426,7 +426,7 @@ cmap_find_batch(const struct cmap *cmap, unsigned long map,
     ULLONG_FOR_EACH_1(i, map) {
         uint32_t c2;
         const struct cmap_bucket *b2 = b2s[i];
-        const struct cmap_node *node;
+        const struct cmap_node __rcu *node;
 
         do {
             c2 = read_even_counter(b2);
@@ -465,14 +465,14 @@ cmap_find_slot_protected(struct cmap_bucket *b, uint32_t hash)
     int i;
 
     for (i = 0; i < CMAP_K; i++) {
-        if (b->hashes[i] == hash && cmap_node_next_protected(&b->nodes[i])) {
+        if (b->hashes[i] == hash && cmap_node_next_protected((const struct cmap_node __rcu *)&b->nodes[i])) {
             return i;
         }
     }
     return -1;
 }
 
-static struct cmap_node *
+static struct cmap_node __rcu *
 cmap_find_bucket_protected(struct cmap_impl *impl, uint32_t hash, uint32_t h)
 {
     struct cmap_bucket *b = &impl->buckets[h & impl->mask];
@@ -480,7 +480,7 @@ cmap_find_bucket_protected(struct cmap_impl *impl, uint32_t hash, uint32_t h)
 
     for (i = 0; i < CMAP_K; i++) {
         if (b->hashes[i] == hash) {
-            return cmap_node_next_protected(&b->nodes[i]);
+            return cmap_node_next_protected((const struct cmap_node __rcu *)&b->nodes[i]);
         }
     }
     return NULL;
@@ -489,13 +489,13 @@ cmap_find_bucket_protected(struct cmap_impl *impl, uint32_t hash, uint32_t h)
 /* Like cmap_find(), but only for use if 'cmap' cannot change concurrently.
  *
  * CMAP_FOR_EACH_WITH_HASH_PROTECTED is usually more convenient. */
-struct cmap_node *
+struct cmap_node __rcu *
 cmap_find_protected(const struct cmap *cmap, uint32_t hash)
 {
     struct cmap_impl *impl = cmap_get_impl(cmap);
     uint32_t h1 = rehash(impl, hash);
     uint32_t h2 = other_hash(hash);
-    struct cmap_node *node;
+    struct cmap_node __rcu *node;
 
     node = cmap_find_bucket_protected(impl, hash, h1);
     if (node) {
@@ -510,7 +510,7 @@ cmap_find_empty_slot_protected(const struct cmap_bucket *b)
     int i;
 
     for (i = 0; i < CMAP_K; i++) {
-        if (!cmap_node_next_protected(&b->nodes[i])) {
+        if (!cmap_node_next_protected((const struct cmap_node __rcu *)&b->nodes[i])) {
             return i;
         }
     }
@@ -519,7 +519,7 @@ cmap_find_empty_slot_protected(const struct cmap_bucket *b)
 
 static void
 cmap_set_bucket(struct cmap_bucket *b, int i,
-                struct cmap_node *node, uint32_t hash)
+                struct cmap_node __rcu *node, uint32_t hash)
 {
     uint32_t c;
 
@@ -534,17 +534,17 @@ cmap_set_bucket(struct cmap_bucket *b, int i,
  * 'new_node' to the node's linked list and returns true.  If it does not find
  * one, returns false. */
 static bool
-cmap_insert_dup(struct cmap_node *new_node, uint32_t hash,
+cmap_insert_dup(struct cmap_node __rcu *new_node, uint32_t hash,
                 struct cmap_bucket *b)
 {
     int i;
 
     for (i = 0; i < CMAP_K; i++) {
         if (b->hashes[i] == hash) {
-            struct cmap_node *node = cmap_node_next_protected(&b->nodes[i]);
+            struct cmap_node __rcu *node = cmap_node_next_protected(&b->nodes[i]);
 
             if (node) {
-                struct cmap_node *p;
+                struct cmap_node __rcu *p;
 
                 /* The common case is that 'new_node' is a singleton,
                  * with a null 'next' pointer.  Rehashing can add a
@@ -558,7 +558,7 @@ cmap_insert_dup(struct cmap_node *new_node, uint32_t hash,
                  * chain. */
                 p = new_node;
                 for (;;) {
-                    struct cmap_node *next = cmap_node_next_protected(p);
+                    struct cmap_node __rcu *next = cmap_node_next_protected(p);
 
                     if (!next) {
                         break;
@@ -588,7 +588,7 @@ cmap_insert_dup(struct cmap_node *new_node, uint32_t hash,
 /* Searches 'b' for an empty slot.  If successful, stores 'node' and 'hash' in
  * the slot and returns true.  Otherwise, returns false. */
 static bool
-cmap_insert_bucket(struct cmap_node *node, uint32_t hash,
+cmap_insert_bucket(struct cmap_node __rcu *node, uint32_t hash,
                    struct cmap_bucket *b)
 {
     int i;
@@ -630,7 +630,7 @@ other_bucket_protected(struct cmap_impl *impl, struct cmap_bucket *b, int slot)
  * problem entirely.
  */
 static bool
-cmap_insert_bfs(struct cmap_impl *impl, struct cmap_node *new_node,
+cmap_insert_bfs(struct cmap_impl *impl, struct cmap_node __rcu *new_node,
                 uint32_t hash, struct cmap_bucket *b1, struct cmap_bucket *b2)
 {
     enum { MAX_DEPTH = 4 };
@@ -726,7 +726,7 @@ cmap_insert_bfs(struct cmap_impl *impl, struct cmap_node *new_node,
 
                     cmap_set_bucket(
                         buckets[k], slots[k],
-                        cmap_node_next_protected(&buckets[k - 1]->nodes[slot]),
+                        cmap_node_next_protected((const struct cmap_node __rcu *)&buckets[k - 1]->nodes[slot]),
                         buckets[k - 1]->hashes[slot]);
                 }
 
@@ -755,7 +755,7 @@ cmap_insert_bfs(struct cmap_impl *impl, struct cmap_node *new_node,
  * 'node' is ordinarily a single node, with a null 'next' pointer.  When
  * rehashing, however, it may be a longer chain of nodes. */
 static bool
-cmap_try_insert(struct cmap_impl *impl, struct cmap_node *node, uint32_t hash)
+cmap_try_insert(struct cmap_impl *impl, struct cmap_node __rcu *node, uint32_t hash)
 {
     uint32_t h1 = rehash(impl, hash);
     uint32_t h2 = other_hash(h1);
@@ -776,7 +776,7 @@ cmap_try_insert(struct cmap_impl *impl, struct cmap_node *node, uint32_t hash)
  *
  * Returns the current number of nodes in the cmap after the insertion. */
 size_t
-cmap_insert(struct cmap *cmap, struct cmap_node *node, uint32_t hash)
+cmap_insert(struct cmap *cmap, struct cmap_node __rcu *node, uint32_t hash)
 {
     struct cmap_impl *impl = cmap_get_impl(cmap);
 
@@ -794,8 +794,8 @@ cmap_insert(struct cmap *cmap, struct cmap_node *node, uint32_t hash)
 }
 
 static bool
-cmap_replace__(struct cmap_impl *impl, struct cmap_node *node,
-               struct cmap_node *replacement, uint32_t hash, uint32_t h)
+cmap_replace__(struct cmap_impl *impl, struct cmap_node __rcu *node,
+               struct cmap_node __rcu *replacement, uint32_t hash, uint32_t h)
 {
     struct cmap_bucket *b = &impl->buckets[h & impl->mask];
     int slot;
@@ -814,9 +814,9 @@ cmap_replace__(struct cmap_impl *impl, struct cmap_node *node,
         ovsrcu_set_hidden(&replacement->next, cmap_node_next_protected(node));
     }
 
-    struct cmap_node *iter = &b->nodes[slot];
+    struct cmap_node __rcu *iter = &b->nodes[slot];
     for (;;) {
-        struct cmap_node *next = cmap_node_next_protected(iter);
+        struct cmap_node __rcu *next = cmap_node_next_protected(iter);
 
         if (next == node) {
             ovsrcu_set(&iter->next, replacement);
@@ -837,8 +837,8 @@ cmap_replace__(struct cmap_impl *impl, struct cmap_node *node,
  * Returns the current number of nodes in the cmap after the replacement.  The
  * number of nodes decreases by one if 'new_node' is NULL. */
 size_t
-cmap_replace(struct cmap *cmap, struct cmap_node *old_node,
-             struct cmap_node *new_node, uint32_t hash)
+cmap_replace(struct cmap *cmap, struct cmap_node __rcu *old_node,
+             struct cmap_node __rcu *new_node, uint32_t hash)
 {
     struct cmap_impl *impl = cmap_get_impl(cmap);
     uint32_t h1 = rehash(impl, hash);
@@ -868,7 +868,7 @@ cmap_try_rehash(const struct cmap_impl *old, struct cmap_impl *new)
         for (i = 0; i < CMAP_K; i++) {
             /* possible optimization here because we know the hashes are
              * unique */
-            struct cmap_node *node = cmap_node_next_protected(&b->nodes[i]);
+            struct cmap_node __rcu *node = cmap_node_next_protected((const struct cmap_node __rcu *)&b->nodes[i]);
 
             if (node && !cmap_try_insert(new, node, b->hashes[i])) {
                 return false;
@@ -950,7 +950,7 @@ cmap_cursor_advance(struct cmap_cursor *cursor)
  * faster and better at dealing with cmaps that change during iteration.
  *
  * Before beginning iteration, set '*pos' to all zeros. */
-struct cmap_node *
+struct cmap_node __rcu *
 cmap_next_position(const struct cmap *cmap,
                    struct cmap_position *pos)
 {
@@ -963,7 +963,7 @@ cmap_next_position(const struct cmap *cmap,
         const struct cmap_bucket *b = &impl->buckets[bucket];
 
         while (entry < CMAP_K) {
-            const struct cmap_node *node = cmap_node_next(&b->nodes[entry]);
+            const struct cmap_node __rcu *node = cmap_node_next((const struct cmap_node __rcu *)&b->nodes[entry]);
             unsigned int i;
 
             for (i = 0; node; i++, node = cmap_node_next(node)) {
@@ -977,7 +977,7 @@ cmap_next_position(const struct cmap *cmap,
                     pos->bucket = bucket;
                     pos->entry = entry;
                     pos->offset = offset;
-                    return CONST_CAST(struct cmap_node *, node);
+                    return CONST_CAST(struct cmap_node __rcu *, node);
                 }
             }
 

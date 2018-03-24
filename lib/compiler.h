@@ -24,11 +24,14 @@
 #define MALLOC_LIKE __attribute__((__malloc__))
 #define ALWAYS_INLINE __attribute__((always_inline))
 #define SENTINEL(N) __attribute__((sentinel(N)))
+#define __rcu
 #else
 #define STRFTIME_FORMAT(FMT)
 #define MALLOC_LIKE
 #define ALWAYS_INLINE
 #define SENTINEL(N)
+//#define __rcu __attribute__((noderef, address_space(4)))
+#define __rcu __attribute__((address_space(4)))
 #endif
 
 /* Output a message (not an error) while compiling without failing the

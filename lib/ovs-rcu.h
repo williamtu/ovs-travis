@@ -168,7 +168,7 @@
         TYPE value__;                                                   \
         typeof(VAR) ovsrcu_var = (VAR);                                 \
                                                                         \
-        atomic_read_explicit(CONST_CAST(ATOMIC(TYPE) *, &ovsrcu_var->p), \
+        atomic_read_explicit(&ovsrcu_var->p, \
                              &value__, ORDER);                          \
                                                                         \
         value__;                                                        \
