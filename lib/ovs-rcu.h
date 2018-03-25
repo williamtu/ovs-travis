@@ -167,10 +167,7 @@
     ({                                                                  \
         TYPE value__;                                                   \
         typeof(VAR) ovsrcu_var = (VAR);                                 \
-                                                                        \
-        atomic_read_explicit(&ovsrcu_var->p, \
-                             &value__, ORDER);                          \
-                                                                        \
+        value__ = ovsrcu_var->p;\
         value__;                                                        \
     })
 #define ovsrcu_get(TYPE, VAR) \
@@ -188,7 +185,7 @@
         typeof(VALUE) ovsrcu_value = (VALUE);                           \
         memory_order ovsrcu_order = (ORDER);                            \
                                                                         \
-        atomic_store_explicit(&ovsrcu_var->p, ovsrcu_value, ovsrcu_order); \
+        ovsrcu_var->p = ovsrcu_value; \
         (void *) 0;                                                     \
     })
 #else  /* not GNU C */

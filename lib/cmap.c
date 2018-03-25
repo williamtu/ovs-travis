@@ -419,7 +419,7 @@ cmap_find_batch(const struct cmap *cmap, unsigned long map,
         }
         /* Found. */
         ULLONG_SET0(map, i); /* Ignore this on round 2. */
-        OVS_PREFETCH(node);
+        OVS_PREFETCH((const void *)node);
         nodes[i] = node;
     }
     /* Round 2. Look into the 2nd bucket, if needed. */
@@ -541,7 +541,7 @@ cmap_insert_dup(struct cmap_node __rcu *new_node, uint32_t hash,
 
     for (i = 0; i < CMAP_K; i++) {
         if (b->hashes[i] == hash) {
-            struct cmap_node __rcu *node = cmap_node_next_protected(&b->nodes[i]);
+            struct cmap_node __rcu *node = cmap_node_next_protected((const struct cmap_node __rcu *)&b->nodes[i]);
 
             if (node) {
                 struct cmap_node __rcu *p;
@@ -558,7 +558,7 @@ cmap_insert_dup(struct cmap_node __rcu *new_node, uint32_t hash,
                  * chain. */
                 p = new_node;
                 for (;;) {
-                    struct cmap_node __rcu *next = cmap_node_next_protected(p);
+                    struct cmap_node __rcu *next = cmap_node_next_protected((const struct cmap_node __rcu *)p);
 
                     if (!next) {
                         break;

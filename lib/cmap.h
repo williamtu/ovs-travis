@@ -74,28 +74,29 @@ struct cmap_node {
 #define atomic_read(SRC, DST) atomic_read_locked(SRC, DST)
 #define atomic_read_explicit(SRC, DST, ORDER)   \
     ((void) (ORDER), atomic_read(SRC, DST))
-*/
 
 #define atomic_read_locked(SRC, DST)            \
      (*(DST) = *(SRC))                           \
 
+*/
 static inline struct cmap_node __rcu *
 cmap_node_next(const struct cmap_node __rcu *node)
 {
-	struct cmap_node __rcu *value__;
-	typeof(&node->next) ovsrcu_var = &node->next; 
+//	struct cmap_node __rcu *value__;
+//	typeof(&node->next) ovsrcu_var = &node->next; 
 
 //	value__ = ovsrcu_var->p;
 
 //	memcpy(&value__, (struct cmap_node __rcu **)&ovsrcu_var->p), 1);	
-	//atomic_read_explicit(
-	atomic_read_locked(
-		(&ovsrcu_var->p),
-                             &value__);
+//atomic_read_explicit(
+//	atomic_read_locked(
+//		(&ovsrcu_var->p),
+//                             &value__);
 //					memory_order_consume);
 
-    return value__;  
-//    return ovsrcu_get(struct cmap_node __rcu *, &node->next);
+//      return value__;  
+    return ovsrcu_get(struct cmap_node __rcu *, &node->next);
+//    return (&node->next)->p;
 }
 
 static inline struct cmap_node __rcu *

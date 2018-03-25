@@ -34,7 +34,7 @@
 #define __rcu __attribute__((address_space(4)))
 #define rcu_dereference_sparse(p, space) \
         ((void)(((typeof(*p) space *)p) == p))
-#define RCU_INITIALIZER(v) (typeof(*(v)) __force __rcu *)(v)
+//#define RCU_INITIALIZER(v) (typeof(*(v)) __force __rcu *)(v)
 // see how kernel handle it include/linux/rcupdate.h
 // see rcu_assign_pointer(p, v)                                              \
 //
