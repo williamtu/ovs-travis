@@ -1270,6 +1270,63 @@ xsk_configure(struct xdp_umem *umem, int ifindex, int queue)
 	return xsk;
 }
 
+static inline void *xq_get_data(struct xdpsock *xsk, __u32 idx, __u32 off)
+{
+	ovs_assert(idx < NUM_FRAMES);
+	return &xsk->umem->frames[idx][off];
+}
+
+static inline int xq_enq(struct xdp_uqueue *uq,
+			 const struct xdp_desc *descs,
+			 unsigned int ndescs)
+{
+	struct xdp_rxtx_queue *q = uq->q;
+	unsigned int i;
+
+	if (xq_nb_free(uq, ndescs) < ndescs)
+		return -ENOSPC;
+
+	for (i = 0; i < ndescs; i++) {
+		u32 idx = uq->cached_head++ & uq->mask;
+
+		q->desc[idx].idx	= descs[i].idx;
+		q->desc[idx].len	= descs[i].len;
+		q->desc[idx].offset	= descs[i].offset;
+	}
+
+	u_smp_wmb();
+
+	q->ptrs.head_idx = uq->cached_head;
+	return 0;
+}
+
+static inline int xq_deq(struct xdp_uqueue *uq,
+			 struct xdp_desc *descs,
+			 int ndescs)
+{
+	struct xdp_rxtx_queue *q = uq->q;
+	unsigned int idx;
+	int i, entries;
+
+	entries = xq_nb_avail(uq, ndescs);
+
+	u_smp_rmb();
+
+	for (i = 0; i < entries; i++) {
+		idx = uq->cached_tail++ & uq->mask;
+		descs[i] = q->desc[idx];
+	}
+
+	if (entries > 0) {
+		u_smp_wmb();
+
+		q->ptrs.tail_idx = uq->cached_tail;
+	}
+
+	return entries;
+}
+
+
 static int
 netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
 {
@@ -1286,7 +1343,7 @@ netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
         struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
         int ifindex, num_socks = 0;
         struct xdpsock *xsk;
-        int queue_id = 1;
+        int queue_id = 2;
 
         if (setrlimit(RLIMIT_MEMLOCK, &r)) {
             VLOG_ERR("ERROR: setrlimit(RLIMIT_MEMLOCK) \"%s\"\n",
@@ -1308,7 +1365,7 @@ netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
     
         xsk = xsk_configure(NULL, ifindex, queue_id);
         netdev->xsks[num_socks++] = xsk;
-        rx->fd = xsk->sfd;
+        rx->fd = xsk->sfd; // poll_loop will poll this fd
     }
     ovs_mutex_unlock(&netdev->mutex);
 
@@ -1445,6 +1502,59 @@ netdev_linux_rxq_recv_tap(int fd, struct dp_packet *buffer)
     return 0;
 }
 
+// XDP
+static int
+netdev_linux_rxq_recv_xdpsock(struct xdpsock *xsk,
+                              struct dp_packet_batch *batch)
+{
+    struct xdp_desc descs[NETDEV_MAX_BURST];
+    unsigned int rcvd, i = 0;
+    int ret = 0;
+
+    /* de-queue the packet from rx ring */
+    rcvd = xq_deq(&xsk->rx, descs, NETDEV_MAX_BURST);
+    if (rcvd == 0) {
+        VLOG_INFO_RL(&rl, "no packet");
+        return 0;
+    }
+
+    //dp_packet_batch_init(batch);
+    VLOG_INFO_RL(&rl, "%s receive %d packets, starting idx %u",
+                 __func__, rcvd, descs[i].idx);
+
+    for (i = 0; i < rcvd; i++) {
+        unsigned int idx = descs[i].idx;
+        struct dp_packet *packet;
+        char *data;
+
+        //ovs_assert(idx < NUM_BUFFERS);
+        data = xq_get_data(xsk, idx, descs[i].offset);
+
+        // no copy
+        packet = xmalloc(sizeof(*packet));
+        dp_packet_use(packet, data, descs[i].len);
+        packet->source = DPBUF_AFXDP; 
+//        packet->idx = idx; // so we know later what to enq 
+//        packet->xqp = xqp;
+
+//        dp_packet_use(packet, data, descs[i].len);
+//        packet = dp_packet_clone_data_with_headroom(data, descs[i].len,
+//                                                    DP_NETDEV_HEADROOM);
+        dp_packet_batch_add(batch, packet);
+     
+#if DEBUG_HEXDUMP
+        sprintf(buf, "idx=%d", idx);
+        hex_dump(data, descs[i].len, buf);
+#endif
+    }
+    dp_packet_batch_init_packet_fields(batch);
+
+    // TODO: don't clone and don't enq
+    //ret = xq_enq(&xqp->rx, descs, rcvd);
+	ovs_assert(ret == 0);
+   	return ret;
+}
+
 static int
 netdev_linux_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch)
 {
@@ -1453,7 +1563,7 @@ netdev_linux_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch)
     struct dp_packet *buffer;
     ssize_t retval;
     int mtu;
-//    struct netdev_linux *ndl = netdev_linux_cast(netdev);
+    struct netdev_linux *ndl = netdev_linux_cast(netdev);
 
     if (netdev_linux_get_mtu__(netdev_linux_cast(netdev), &mtu)) {
         mtu = ETH_PAYLOAD_MAX;
@@ -1464,8 +1574,8 @@ netdev_linux_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch)
                                            DP_NETDEV_HEADROOM);
     retval = (rx->is_tap
               ? netdev_linux_rxq_recv_tap(rx->fd, buffer)
-              //: netdev_linux_rxq_recv_xdpsock(ndl->xqp, batch));
-              : netdev_linux_rxq_recv_sock(rx->fd, buffer));
+              : netdev_linux_rxq_recv_xdpsock(ndl->xsks[0], batch));
+              //: netdev_linux_rxq_recv_sock(rx->fd, buffer));
 
     if (retval) {
         if (retval != EAGAIN && retval != EMSGSIZE) {

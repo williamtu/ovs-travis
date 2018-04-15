@@ -42,6 +42,7 @@ enum OVS_PACKED_ENUM dp_packet_source {
     DPBUF_DPDK,                /* buffer data is from DPDK allocated memory.
                                 * ref to dp_packet_init_dpdk() in dp-packet.c.
                                 */
+    DPBUF_AFXDP,
 };
 
 #define DP_PACKET_CONTEXT_SIZE 64
@@ -174,7 +175,9 @@ dp_packet_delete(struct dp_packet *b)
             free_dpdk_buf((struct dp_packet*) b);
             return;
         }
-
+        if (b->source == DPBUF_AFXDP) {
+            return;
+        }
         dp_packet_uninit(b);
         free(b);
     }
