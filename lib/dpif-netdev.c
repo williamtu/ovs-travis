@@ -5549,7 +5549,7 @@ dp_netdev_run_meter(struct dp_netdev *dp, struct dp_packet_batch *packets_,
     memset(exceeded_rate, 0, cnt * sizeof *exceeded_rate);
 
     /* All packets will hit the meter at the same time. */
-    long_delta_t = (now - meter->used) / 1000; /* msec */
+    long_delta_t = now / 1000 - meter->used / 1000; /* msec */
 
     /* Make sure delta_t will not be too large, so that bucket will not
      * wrap around below. */
@@ -7241,6 +7241,7 @@ dp_execute_cb(void *aux_, struct dp_packet_batch *packets_,
     case OVS_ACTION_ATTR_PUSH_NSH:
     case OVS_ACTION_ATTR_POP_NSH:
     case OVS_ACTION_ATTR_CT_CLEAR:
+    case OVS_ACTION_ATTR_CHECK_PKT_LEN:
     case __OVS_ACTION_ATTR_MAX:
         OVS_NOT_REACHED();
     }
@@ -7584,6 +7585,13 @@ struct dpcls_subtable {
     /* 'mask' must be the last field, additional space is allocated here. */
 };
 
+static void
+dpcls_subtable_destroy_cb(struct dpcls_subtable *subtable)
+{
+    cmap_destroy(&subtable->rules);
+    ovsrcu_postpone(free, subtable);
+}
+
 /* Initializes 'cls' as a classifier that initially contains no classification
  * rules. */
 static void
@@ -7600,8 +7608,7 @@ dpcls_destroy_subtable(struct dpcls *cls, struct dpcls_subtable *subtable)
     pvector_remove(&cls->subtables, subtable);
     cmap_remove(&cls->subtables_map, &subtable->cmap_node,
                 subtable->mask.hash);
-    cmap_destroy(&subtable->rules);
-    ovsrcu_postpone(free, subtable);
+    ovsrcu_postpone(dpcls_subtable_destroy_cb, subtable);
 }
 
 /* Destroys 'cls'.  Rules within 'cls', if any, are not freed; this is the
