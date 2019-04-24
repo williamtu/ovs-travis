@@ -22,7 +22,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <inttypes.h>
-#include <linux/gen_stats.h>
 #include <linux/if_ether.h>
 #include <linux/if_tun.h>
 #include <linux/types.h>
