@@ -22,13 +22,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <inttypes.h>
-#include <linux/if_ether.h>
-#include <linux/if_tun.h>
-#include <linux/types.h>
-#include <linux/ethtool.h>
-#include <linux/mii.h>
-#include <linux/rtnetlink.h>
-#include <linux/sockios.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/utsname.h>
@@ -73,6 +66,13 @@
 #include "netdev-afxdp.h"
 
 #ifdef HAVE_AF_XDP
+#include <linux/if_ether.h>
+#include <linux/if_tun.h>
+#include <linux/types.h>
+#include <linux/ethtool.h>
+#include <linux/mii.h>
+#include <linux/rtnetlink.h>
+#include <linux/sockios.h>
 #include <linux/if_xdp.h>
 #include "xdpsock.h"
 
