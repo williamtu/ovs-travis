@@ -27,6 +27,7 @@ struct netdev;
 struct xsk_socket_info;
 struct xdp_umem;
 struct dp_packet_batch;
+struct smap;
 
 struct xsk_socket_info *xsk_configure(int ifindex, int xdp_queue_id);
 void xsk_destroy(struct xsk_socket_info *xsk);

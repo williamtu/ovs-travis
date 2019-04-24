@@ -538,6 +538,9 @@ retry:
 }
 
 #else
+#include "openvswitch/compiler.h"
+#include "netdev-afxdp.h"
+
 struct xsk_socket_info *
 xsk_configure(int ifindex OVS_UNUSED, int xdp_queue_id OVS_UNUSED)
 {
