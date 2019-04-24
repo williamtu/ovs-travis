@@ -15,6 +15,7 @@
  */
 
 #include <config.h>
+#ifdef HAVE_AF_XDP
 #include "netdev-linux.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -65,7 +66,6 @@
 #include "util.h"
 #include "netdev-afxdp.h"
 
-#ifdef HAVE_AF_XDP
 #include <linux/if_ether.h>
 #include <linux/if_tun.h>
 #include <linux/types.h>
