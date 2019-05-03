@@ -663,10 +663,13 @@ ofpact_nest_get_action_len(const struct ofpact_nest *on)
  * If NX_CT_F_FORCE is set, in addition to NX_CT_F_COMMIT, then the conntrack
  * entry is replaced with a new one in case the original direction of the
  * existing entry is opposite of the current packet direction.
+ * If NX_CT_F_TIMEOUT is set, a timeout policy is provied to associate
+ * with the conntrack entry.
  */
 enum nx_conntrack_flags {
     NX_CT_F_COMMIT = 1 << 0,
     NX_CT_F_FORCE  = 1 << 1,
+    NX_CT_F_TIMEOUT = 1 << 2,
 };
 
 /* Magic value for struct nx_action_conntrack 'recirc_table' field, to specify
@@ -692,6 +695,7 @@ struct ofpact_conntrack {
         struct mf_subfield zone_src;
         uint16_t alg;
         uint8_t recirc_table;
+        uint32_t timeout;
     );
     struct ofpact actions[0];
 };

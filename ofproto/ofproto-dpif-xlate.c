@@ -5973,6 +5973,18 @@ put_ct_helper(struct xlate_ctx *ctx,
     }
 }
 
+// XXX: based on datapath type, expand it to different rules
+static void
+put_ct_timeout(struct ofpbuf *odp_actions, struct ofpact_conntrack *ofc)
+{
+    if (ofc->flags & NX_CT_F_TIMEOUT) {
+        struct ds s = DS_EMPTY_INITIALIZER;
+        ds_put_format(&s, "ovs_tp_%"PRIu32, ofc->timeout);
+        nl_msg_put_string(odp_actions, OVS_CT_ATTR_TIMEOUT, ds_cstr(&s));
+        ds_destroy(&s);
+    }
+}
+
 static void
 put_ct_nat(struct xlate_ctx *ctx)
 {
@@ -6068,6 +6080,7 @@ compose_conntrack_action(struct xlate_ctx *ctx, struct ofpact_conntrack *ofc,
     put_ct_mark(&ctx->xin->flow, ctx->odp_actions, ctx->wc);
     put_ct_label(&ctx->xin->flow, ctx->odp_actions, ctx->wc);
     put_ct_helper(ctx, ctx->odp_actions, ofc);
+    put_ct_timeout(ctx->odp_actions, ofc);
     put_ct_nat(ctx);
     ctx->ct_nat_action = NULL;
     nl_msg_end_nested(ctx->odp_actions, ct_offset);

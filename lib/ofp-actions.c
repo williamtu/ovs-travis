@@ -6428,6 +6428,14 @@ check_DEBUG_SLOW(const struct ofpact_null *a OVS_UNUSED,
  *      NXM_NX_CT_STATE field for such connections if the 'recirc_table' is
  *      specified.
  *
+ * The "timeout" specifies a timeout policy which the tracking is associated:
+ *
+ *      The 'timeout' is a 32-bit number that identify a preconfigured
+ *      timeout policy in the datapath.  It is used to associate the
+ *      connection with the preconfigured timeout policy when the connection
+ *      is committed.
+ *      Refer to ovs-actions (7) for more details.
+ *
  * Zero or more actions may immediately follow this action. These actions will
  * be executed within the context of the connection tracker, and they require
  * NX_CT_F_COMMIT flag be set.
@@ -6449,6 +6457,11 @@ struct nx_action_conntrack {
     uint8_t pad[3];             /* Zeroes */
     ovs_be16 alg;               /* Well-known port number for the protocol.
                                  * 0 indicates no ALG is required. */
+    /* If NX_CT_F_TIMEOUT is set in 'flags', followed by an optional 4 bytes
+     * integer and 4 bytes padding.  The length is included in 'len'.
+     *      ovs_be32 timeout;   // timeout policy id
+     *      uint8_t pad2[4];    // padding to align to a multiple of 8 bytes.
+     */
     /* Followed by a sequence of zero or more OpenFlow actions. The length of
      * these is included in 'len'. */
 };
@@ -6497,10 +6510,13 @@ decode_NXAST_RAW_CT(const struct nx_action_conntrack *nac,
 {
     const size_t ct_offset = ofpacts_pull(out);
     struct ofpact_conntrack *conntrack = ofpact_put_CT(out);
+    const void *ofpact_data = nac + 1;
+    size_t ofpact_len = ntohs(nac->len) - sizeof *nac;
     int error;
 
     conntrack->flags = ntohs(nac->flags);
-    if (conntrack->flags & NX_CT_F_FORCE &&
+    if ((conntrack->flags & NX_CT_F_FORCE ||
+        conntrack->flags & NX_CT_F_TIMEOUT) &&
         !(conntrack->flags & NX_CT_F_COMMIT)) {
         error = OFPERR_OFPBAC_BAD_ARGUMENT;
         goto out;
@@ -6512,11 +6528,24 @@ decode_NXAST_RAW_CT(const struct nx_action_conntrack *nac,
     }
     conntrack->recirc_table = nac->recirc_table;
     conntrack->alg = ntohs(nac->alg);
+    if (conntrack->flags & NX_CT_F_TIMEOUT) {
+        if (ofpact_len < sizeof conntrack->timeout) {
+            VLOG_WARN_RL(&rl, "conntrack action only has %"PRIuSIZE" bytes "
+                         "allocated for timeout field.  %"PRIuSIZE"bytes are "
+                         "required for timeout field.",
+                         ofpact_len, sizeof conntrack->timeout);
+            return OFPERR_OFPBAC_BAD_LEN;
+        }
+        const ovs_be32 *timeout = ofpact_data;
+        conntrack->timeout = ntohl(*timeout);
+        ofpact_data = (char *) ofpact_data + sizeof conntrack->timeout;
+        ofpact_len -= ROUND_UP(sizeof conntrack->timeout, 8);
+    }
 
     ofpbuf_pull(out, sizeof(*conntrack));
 
-    struct ofpbuf openflow = ofpbuf_const_initializer(
-        nac + 1, ntohs(nac->len) - sizeof(*nac));
+    struct ofpbuf openflow = ofpbuf_const_initializer(ofpact_data,
+                                                      ofpact_len);
     error = ofpacts_pull_openflow_actions__(&openflow, openflow.size,
                                             ofp_version,
                                             1u << OVSINST_OFPIT11_APPLY_ACTIONS,
@@ -6557,7 +6586,7 @@ encode_CT(const struct ofpact_conntrack *conntrack,
 {
     struct nx_action_conntrack *nac;
     const size_t ofs = out->size;
-    size_t len;
+    size_t len = 0;
 
     nac = put_NXAST_CT(out);
     nac->flags = htons(conntrack->flags);
@@ -6571,8 +6600,14 @@ encode_CT(const struct ofpact_conntrack *conntrack,
     }
     nac->recirc_table = conntrack->recirc_table;
     nac->alg = htons(conntrack->alg);
+    if (conntrack->flags & NX_CT_F_TIMEOUT) {
+        ovs_be32 timeout = htonl(conntrack->timeout);
+        ofpbuf_put(out, &timeout, sizeof timeout);
+        ofpbuf_put_zeros(out, PAD_SIZE(sizeof timeout, 8));
+        len += ROUND_UP(sizeof timeout, 8);
+    }
 
-    len = ofpacts_put_openflow_actions(conntrack->actions,
+    len += ofpacts_put_openflow_actions(conntrack->actions,
                                        ofpact_ct_get_action_len(conntrack),
                                        out, ofp_version);
     len += sizeof(*nac);
@@ -6623,6 +6658,9 @@ parse_CT(char *arg, const struct ofpact_parse_params *pp)
             }
         } else if (!strcmp(key, "alg")) {
             error = str_to_connhelper(value, &oc->alg);
+        } else if (!strcmp(key, "timeout")) {
+            oc->flags |= NX_CT_F_TIMEOUT;
+            error = str_to_u32(value, &oc->timeout);
         } else if (!strcmp(key, "nat")) {
             const size_t nat_offset = ofpacts_pull(pp->ofpacts);
 
@@ -6727,6 +6765,10 @@ format_CT(const struct ofpact_conntrack *a,
         ds_put_format(fp->s, "%s),%s", colors.paren, colors.end);
     }
     format_alg(a->alg, fp->s);
+    if (a->flags & NX_CT_F_TIMEOUT) {
+        ds_put_format(fp->s, "%stimeout=%s%"PRIu32, colors.paren, colors.end,
+                      a->timeout);
+    }
     ds_chomp(fp->s, ',');
     ds_put_format(fp->s, "%s)%s", colors.paren, colors.end);
 }
