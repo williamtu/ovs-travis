@@ -1442,6 +1442,20 @@ check_support(struct dpif_backer *backer)
     backer->rt_support.max_hash_alg = check_max_dp_hash_alg(backer);
     backer->rt_support.check_pkt_len = check_check_pkt_len(backer);
 
+    /* generic_ct_tp tests whether 'backer''s datapath supports the generic
+     * conntrack timeout policy.
+     *
+     * In dpif-netlink (kernel datapath), conntrack timeout policy is L3/L4
+     * specific.  For example, to customize tcp and udp timeout, we need to
+     * maintain four timeout policies (inet/tcp, inet6/tcp, inet/udp,
+     * inet6/udp) in kernel datapath.
+     *
+     * Currently, dpif-netdev (userspace datapath) does not support conntrack
+     * timeout policy support yet.  OVS plans to support generic conntrack
+     * timeout policy that can be shared by various L3/L4.  We need to
+     * implement check_generic_ct_tp() when dpif-netdev supports it. */
+    backer->rt_support.generic_ct_tp = false;
+
     /* Flow fields. */
     backer->rt_support.odp.ct_state = check_ct_state(backer);
     backer->rt_support.odp.ct_zone = check_ct_zone(backer);

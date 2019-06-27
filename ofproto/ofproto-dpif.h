@@ -194,8 +194,11 @@ struct group_dpif *group_dpif_lookup(struct ofproto_dpif *,
     /* Highest supported dp_hash algorithm. */                              \
     DPIF_SUPPORT_FIELD(size_t, max_hash_alg, "Max dp_hash algorithm")       \
                                                                             \
-    /* True if the datapath supports OVS_ACTION_ATTR_CHECK_PKT_LEN. */   \
-    DPIF_SUPPORT_FIELD(bool, check_pkt_len, "Check pkt length action")
+    /* True if the datapath supports OVS_ACTION_ATTR_CHECK_PKT_LEN. */      \
+    DPIF_SUPPORT_FIELD(bool, check_pkt_len, "Check pkt length action")      \
+                                                                            \
+    /* True if the datapath supports generic conntrack timeout policy. */   \
+    DPIF_SUPPORT_FIELD(bool, generic_ct_tp, "Generic timeout policy")
 
 /* Stores the various features which the corresponding backer supports. */
 struct dpif_backer_support {
