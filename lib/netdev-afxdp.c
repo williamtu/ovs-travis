@@ -48,6 +48,7 @@
 
 COVERAGE_DEFINE(afxdp_cq_empty);
 COVERAGE_DEFINE(afxdp_fq_full);
+COVERAGE_DEFINE(afxdp_cq_skip);
 
 VLOG_DEFINE_THIS_MODULE(netdev_afxdp);
 static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(5, 20);
@@ -722,6 +723,7 @@ afxdp_complete_tx(struct xsk_socket_info *xsk_info)
         addr = (uint64_t *)xsk_ring_cons__comp_addr(&umem->cq, idx_cq++);
         if (*addr == UINT64_MAX) {
             /* The elem has been pushed already */
+            COVERAGE_INC(afxdp_cq_skip);
             continue;
         }
         elem = ALIGNED_CAST(struct umem_elem *,
