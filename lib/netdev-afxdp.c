@@ -585,14 +585,18 @@ netdev_afxdp_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch,
 
     /* Setup a dp_packet batch from descriptors in RX queue */
     for (i = 0; i < rcvd; i++) {
-        uint64_t addr = xsk_ring_cons__rx_desc(&xsk_info->rx, idx_rx)->addr;
-        uint32_t len = xsk_ring_cons__rx_desc(&xsk_info->rx, idx_rx)->len;
-        char *pkt = xsk_umem__get_data(umem->buffer, addr);
-        uint64_t index;
-
         struct dp_packet_afxdp *xpacket;
+        const struct xdp_desc *desc;
         struct dp_packet *packet;
+        uint64_t addr, index;
+        uint32_t len;
+        char *pkt;
 
+        desc = xsk_ring_cons__rx_desc(&xsk_info->rx,idx_rx);
+        addr = desc->addr;
+        len = desc->len;
+
+        pkt = xsk_umem__get_data(umem->buffer, addr);
         index = addr >> FRAME_SHIFT;
         xpacket = UMEM2XPKT(umem->xpool.array, index);
         packet = &xpacket->packet;
@@ -736,6 +740,9 @@ afxdp_complete_tx(struct xsk_socket_info *xsk_info)
         xsk_ring_cons__release(&umem->cq, tx_done);
     } else {
         COVERAGE_INC(afxdp_cq_empty);
+        if (xsk_info->outstanding_tx) {
+            kick_tx(xsk_info);
+        }
     }
     xsk_info->outstanding_tx -= tx_to_free;
 }
