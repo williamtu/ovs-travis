@@ -48,6 +48,7 @@
 
 COVERAGE_DEFINE(afxdp_cq_empty);
 COVERAGE_DEFINE(afxdp_fq_full);
+COVERAGE_DEFINE(afxdp_tx_full);
 COVERAGE_DEFINE(afxdp_cq_skip);
 
 VLOG_DEFINE_THIS_MODULE(netdev_afxdp);
@@ -626,10 +627,6 @@ kick_tx(struct xsk_socket_info *xsk_info)
 {
     int ret;
 
-    if (!xsk_info->outstanding_tx) {
-        return 0;
-    }
-
     /* This causes system call into kernel's xsk_sendmsg, and
      * xsk_generic_xmit (skb mode) or xsk_async_xmit (driver mode).
      */
@@ -784,6 +781,9 @@ netdev_afxdp_batch_send(struct netdev *netdev, int qid,
     if (OVS_UNLIKELY(ret == 0)) {
         umem_elem_push_n(&umem->mpool, batch->count, (void **)elems_pop);
         xsk_info->tx_dropped += batch->count;
+        afxdp_complete_tx(xsk_info);
+        COVERAGE_INC(afxdp_tx_full);
+        kick_tx(xsk_info);
         error = ENOMEM;
         goto out;
     }
