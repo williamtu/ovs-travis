@@ -746,11 +746,11 @@ netdev_afxdp_batch_send(struct netdev *netdev, int qid,
                         bool concurrent_txq)
 {
     struct netdev_linux *dev = netdev_linux_cast(netdev);
-    struct xsk_socket_info *xsk_info = dev->xsks[qid];
     struct umem_elem *elems_pop[BATCH_SIZE];
+    struct xsk_socket_info *xsk_info;
     struct xsk_umem_info *umem;
     struct dp_packet *packet;
-    bool free_batch = true;
+    bool free_batch = false;
     uint32_t idx = 0;
     int error = 0;
     int ret;
@@ -760,6 +760,7 @@ netdev_afxdp_batch_send(struct netdev *netdev, int qid,
         ovs_spin_lock(&dev->tx_locks[qid]);
     }
 
+    xsk_info = dev->xsks[qid];
     if (!xsk_info || !xsk_info->xsk) {
         goto out;
     }
