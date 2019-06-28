@@ -28,12 +28,14 @@
 #include "bond.h"
 #include "bundle.h"
 #include "byte-order.h"
+#include "ct-dpif.h"
 #include "cfm.h"
 #include "connmgr.h"
 #include "coverage.h"
 #include "csum.h"
 #include "dp-packet.h"
 #include "dpif.h"
+#include "dpif-netlink.h"
 #include "in-band.h"
 #include "lacp.h"
 #include "learn.h"
@@ -5973,15 +5975,26 @@ put_ct_helper(struct xlate_ctx *ctx,
     }
 }
 
-// XXX: based on datapath type, expand it to different rules
 static void
-put_ct_timeout(struct ofpbuf *odp_actions, struct ofpact_conntrack *ofc)
+put_ct_timeout(struct ofpbuf *odp_actions, struct ofpact_conntrack *ofc,
+               const struct flow *flow, struct flow_wildcards *wc,
+               bool generic_ct_tp)
 {
-    if (ofc->flags & NX_CT_F_TIMEOUT) {
-        struct ds s = DS_EMPTY_INITIALIZER;
-        ds_put_format(&s, "ovs_tp_%"PRIu32, ofc->timeout);
-        nl_msg_put_string(odp_actions, OVS_CT_ATTR_TIMEOUT, ds_cstr(&s));
-        ds_destroy(&s);
+    if (ct_dpif_timeout_policy_support_ipproto(flow->nw_proto)) {
+        struct ds ds = DS_EMPTY_INITIALIZER;
+
+        if (generic_ct_tp) {
+            ds_put_format(&ds, "ovs_tp_%"PRIu32, ofc->timeout);
+        } else {
+            if (!generic_ct_tp) {
+                dpif_netlink_format_tp_name(ofc->timeout,
+                        flow->dl_type == htons(ETH_TYPE_IP) ? AF_INET : AF_INET6,
+                        flow->nw_proto, &ds);
+                memset(&wc->masks.nw_proto, 0xff, sizeof wc->masks.nw_proto);
+            }
+            nl_msg_put_string(odp_actions, OVS_CT_ATTR_TIMEOUT, ds_cstr(&ds));
+            ds_destroy(&ds);
+        }
     }
 }
 
@@ -6080,7 +6093,10 @@ compose_conntrack_action(struct xlate_ctx *ctx, struct ofpact_conntrack *ofc,
     put_ct_mark(&ctx->xin->flow, ctx->odp_actions, ctx->wc);
     put_ct_label(&ctx->xin->flow, ctx->odp_actions, ctx->wc);
     put_ct_helper(ctx, ctx->odp_actions, ofc);
-    put_ct_timeout(ctx->odp_actions, ofc);
+    if (ofc->flags & NX_CT_F_TIMEOUT) {
+        put_ct_timeout(ctx->odp_actions, ofc, &ctx->xin->flow, ctx->wc,
+                       ctx->xbridge->support.generic_ct_tp);
+    }
     put_ct_nat(ctx);
     ctx->ct_nat_action = NULL;
     nl_msg_end_nested(ctx->odp_actions, ct_offset);
