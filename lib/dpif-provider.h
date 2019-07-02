@@ -80,6 +80,7 @@ dpif_flow_dump_thread_init(struct dpif_flow_dump_thread *thread,
 struct ct_dpif_dump_state;
 struct ct_dpif_entry;
 struct ct_dpif_tuple;
+struct ct_dpif_timeout_policy;
 
 /* 'dpif_ipf_proto_status' and 'dpif_ipf_status' are presently in
  * sync with 'ipf_proto_status' and 'ipf_status', but more
@@ -497,6 +498,20 @@ struct dpif_class {
     /* Deletes per zone limit of all zones specified in 'zone_limits', a
      * list of 'struct ct_dpif_zone_limit' entries. */
     int (*ct_del_limits)(struct dpif *, const struct ovs_list *zone_limits);
+
+    /* Connection tracking timeout policy */
+
+    /* XXX: Add comments */
+    int (*ct_set_timeout_policy)(struct dpif *,
+                                 const struct ct_dpif_timeout_policy *tp);
+    int (*ct_get_timeout_policy)(struct dpif *,
+                                 struct ct_dpif_timeout_policy *tp);
+    int (*ct_del_timeout_policy)(struct dpif *, uint32_t tp_id);
+    int (*ct_timeout_policy_dump_start)(struct dpif *, void **statep);
+    /* XXX: caller should free '*tp' */
+    int (*ct_timeout_policy_dump_next)(struct dpif *, void *state,
+                                       struct ct_dpif_timeout_policy **tp);
+    int (*ct_timeout_policy_dump_done)(struct dpif *, void *state);
 
     /* IP Fragmentation. */
 
