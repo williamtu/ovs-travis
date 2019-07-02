@@ -51,6 +51,7 @@
 #include "util.h"
 #include "openvswitch/ofp-flow.h"
 #include "openvswitch/ofp-port.h"
+#include "openvswitch/ofp-parse.h"
 
 typedef int dpctl_command_handler(int argc, const char *argv[],
                                   struct dpctl_params *);
@@ -1931,6 +1932,256 @@ out:
 }
 
 static int
+dpctl_ct_set_tp(int argc, const char *argv[], struct dpctl_params *dpctl_p)
+{
+    struct ct_dpif_timeout_policy tp;
+    struct dpif *dpif;
+    struct ds ds = DS_EMPTY_INITIALIZER;
+    int err, i =  dp_arg_exists(argc, argv) ? 2 : 1;
+
+    err = opt_dpif_open(argc, argv, dpctl_p, 3 + CT_DPIF_TP_ATTR_MAX, &dpif);
+    if (err) {
+        return err;
+    }
+
+    /* Parse timeout name */
+    memset(&tp, 0, sizeof tp);
+    if (!ovs_scan(argv[i], "tp=%"SCNu32, &tp.id)) {
+        ds_put_cstr(&ds, "Failed to parse timeout policy id.");
+        err = EINVAL;
+        goto error;
+    }
+
+    /* Parse timeout parameters */
+    while (++i < argc) {
+        char *key, *value, *pos, *copy;
+        pos = copy = xstrdup(argv[i]);
+        if (!ofputil_parse_key_value(&pos, &key, &value) ||
+            !ct_dpif_parse_timeout_policy(&tp, key, value)) {
+            ds_put_format(&ds, "Invalid timeout policy parameter: %s",
+                          argv[i]);
+            err = EINVAL;
+            free(copy);
+            goto error;
+        }
+        free(copy);
+    }
+
+    if (!tp.present) {
+        ds_put_cstr(&ds, "Invalid timeout policy parameter ");
+        err = EINVAL;
+        goto error;
+    }
+
+    err = ct_dpif_set_timeout_policy(dpif, &tp);
+    if (err) {
+        ds_put_format(&ds, "Failed to set timeout policy %"PRIu32, tp.id);
+    } else {
+        goto out;
+    }
+
+error:
+    dpctl_error(dpctl_p, err, "\n%s\n", ds_cstr(&ds));
+out:
+    ds_destroy(&ds);
+    dpif_close(dpif);
+    return err;
+}
+
+static int
+parse_ct_timeout_policy_ids(const char *argv, struct ovs_list *tps,
+                            struct ds *ds)
+{
+    struct ct_dpif_timeout_policy *tp;
+    uint32_t tp_id;
+    char *save_ptr = NULL, *argcopy, *next_tp;
+
+    if (strncmp(argv, "tp=", 3)) {
+        ds_put_format(ds, "invalid argument %s", argv);
+        return EINVAL;
+    }
+
+    argcopy = xstrdup(argv + 3);
+    next_tp= strtok_r(argcopy, ",", &save_ptr);
+
+    do {
+        if (ovs_scan(next_tp, "%"SCNu32, &tp_id)) {
+            tp = xzalloc(sizeof *tp);
+            tp->id = tp_id;
+            ovs_list_push_back(tps, &tp->node);
+        } else {
+            ds_put_cstr(ds, "invalid timeout policy id");
+            free(argcopy);
+            return EINVAL;
+        }
+    } while ((next_tp= strtok_r(NULL, ",", &save_ptr)) != NULL);
+
+    free(argcopy);
+    return 0;
+}
+
+static int
+dpctl_ct_del_tp(int argc, const char *argv[], struct dpctl_params *dpctl_p)
+{
+    struct ct_dpif_timeout_policy *tp;
+    struct ovs_list tps = OVS_LIST_INITIALIZER(&tps);
+    struct ds err_list = DS_EMPTY_INITIALIZER;
+    struct ds ds = DS_EMPTY_INITIALIZER;
+    struct dpif *dpif;
+    int err;
+    int i =  dp_arg_exists(argc, argv) ? 2 : 1;
+
+    err = opt_dpif_open(argc, argv, dpctl_p, 3, &dpif);
+    if (err) {
+        return err;
+    }
+
+    err = parse_ct_timeout_policy_ids(argv[i], &tps, &ds);
+    if (err) {
+        goto error;
+    }
+
+    LIST_FOR_EACH (tp, node, &tps) {
+        if (!tp->id) {
+            dpctl_print(dpctl_p, "cannot delete default timeout policy 0\n");
+            err = EINVAL;
+        } else {
+            err = ct_dpif_del_timeout_policy(dpif, tp->id);
+        }
+        if (err == EOPNOTSUPP) {
+            ds_put_cstr(&ds, "datapath does not support this operation");
+            goto error;
+        } else if (err) {
+            if (err_list.length) {
+                ds_put_cstr(&err_list, ", ");
+            }
+            ds_put_format(&err_list, "%"PRIu32, tp->id);
+        }
+    }
+
+    if (err_list.length) {
+        ds_put_format(&ds, "failed to delete timeout policy: %s",
+                      ds_cstr(&err_list));
+    } else {
+        goto out;
+    }
+
+error:
+    dpctl_error(dpctl_p, err, "%s", ds_cstr(&ds));
+out:
+    ct_dpif_free_timeout_policies(&tps);
+    ds_destroy(&ds);
+    ds_destroy(&err_list);
+    dpif_close(dpif);
+    return err;
+}
+
+static int
+dpctl_ct_dump_tps(struct dpif *dpif, struct dpctl_params *dpctl_p,
+                  struct ds *ds)
+{
+    struct ct_dpif_timeout_policy default_tp, *tp;
+    struct ds s = DS_EMPTY_INITIALIZER;
+    void *state;
+    int err;
+
+    /* Get default timeout policy */
+    default_tp.id = 0;
+    err = ct_dpif_get_timeout_policy(dpif, &default_tp);
+    if (err) {
+        if (err == EOPNOTSUPP) {
+            ds_put_cstr(ds, "datapath does not support this operation");
+        }
+        return err;
+    }
+    ct_dpif_format_timeout_policy(&default_tp, &s);
+    dpctl_print(dpctl_p, "%s\n", ds_cstr(&s));
+    ds_clear(&s);
+
+    /* Dump all the timeout policies */
+    ct_dpif_timeout_policy_dump_start(dpif, &state);
+    while (!(err = ct_dpif_timeout_policy_dump_next(dpif, state, &tp))) {
+        ct_dpif_format_timeout_policy(tp, &s);
+        dpctl_print(dpctl_p, "%s\n", ds_cstr(&s));
+        free(tp);
+        ds_clear(&s);
+    }
+    ct_dpif_timeout_policy_dump_done(dpif, state);
+
+    ds_destroy(&s);
+    return err;
+}
+
+static int
+dpctl_ct_get_tps(struct dpif *dpif, struct dpctl_params *dpctl_p,
+                 struct ovs_list *tps, struct ds *ds, struct ds *err_list)
+{
+    struct ct_dpif_timeout_policy *tp;
+    int err = 0;
+
+    LIST_FOR_EACH (tp, node, tps) {
+        err = ct_dpif_get_timeout_policy(dpif, tp);
+        if (err == EOPNOTSUPP) {
+            ds_put_cstr(ds, "datapath does not support this operation");
+            return err;
+        } else if (err) {
+            if (err_list->length) {
+                ds_put_cstr(err_list, ", ");
+            }
+            ds_put_format(err_list, "%"PRIu32, tp->id);
+        } else {
+            ct_dpif_format_timeout_policy(tp, ds);
+            dpctl_print(dpctl_p, "%s\n", ds_cstr(ds));
+            ds_clear(ds);
+        }
+    }
+    return err;
+}
+
+static int
+dpctl_ct_get_tp(int argc, const char *argv[], struct dpctl_params *dpctl_p)
+{
+    struct ovs_list tps = OVS_LIST_INITIALIZER(&tps);
+    struct ds err_list = DS_EMPTY_INITIALIZER;
+    struct ds ds = DS_EMPTY_INITIALIZER;
+    struct dpif *dpif;
+    int i =  dp_arg_exists(argc, argv) ? 2 : 1;
+    int err;
+
+    err = opt_dpif_open(argc, argv, dpctl_p, 3, &dpif);
+    if (err) {
+        return err;
+    }
+
+    if (i == argc) {
+        err = dpctl_ct_dump_tps(dpif, dpctl_p, &ds);
+    } else {
+        err = parse_ct_timeout_policy_ids(argv[i], &tps, &ds);
+        if (err) {
+            goto error;
+        }
+        err = dpctl_ct_get_tps(dpif, dpctl_p, &tps, &ds, &err_list);
+        if (err_list.length) {
+            ds_put_format(&ds, "failed to get timeout policy: %s",
+                          ds_cstr(&err_list));
+        }
+    }
+
+    if (!err || err == EOF)  {
+        goto out;
+    }
+
+error:
+    dpctl_error(dpctl_p, err, "%s", ds_cstr(&ds));
+out:
+    ct_dpif_free_timeout_policies(&tps);
+    ds_destroy(&ds);
+    ds_destroy(&err_list);
+    dpif_close(dpif);
+    return err;
+}
+
+static int
 ipf_set_enabled__(int argc, const char *argv[], struct dpctl_params *dpctl_p,
                   bool enabled)
 {
@@ -2443,6 +2694,12 @@ static const struct dpctl_command all_commands[] = {
     { "ct-del-limits", "[dp] zone=N1[,N2]...", 1, 2, dpctl_ct_del_limits,
         DP_RO },
     { "ct-get-limits", "[dp] [zone=N1[,N2]...]", 0, 2, dpctl_ct_get_limits,
+        DP_RO },
+    { "ct-set-tp", "[dp] tp=N [parameters]", 2, 2 + CT_DPIF_TP_ATTR_MAX,
+        dpctl_ct_set_tp, DP_RO },
+    { "ct-del-tp", "[dp] tp=N1,[N2]...", 1, 2, dpctl_ct_del_tp,
+        DP_RO },
+    { "ct-get-tp", "[dp] [tp=N1,[N2]...]", 0, 2, dpctl_ct_get_tp,
         DP_RO },
     { "ipf-set-enabled", "[dp] v4|v6", 1, 2, dpctl_ipf_set_enabled, DP_RW },
     { "ipf-set-disabled", "[dp] v4|v6", 1, 2, dpctl_ipf_set_disabled, DP_RW },
