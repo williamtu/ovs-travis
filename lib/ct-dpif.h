@@ -341,6 +341,7 @@ bool ct_dpif_parse_timeout_policy(struct ct_dpif_timeout_policy *timeout,
 void ct_dpif_format_timeout_policy(struct ct_dpif_timeout_policy *timeout,
                                    struct ds *ds);
 void ct_dpif_free_timeout_policies(struct ovs_list *tps);
+bool ct_dpif_timeout_policy_support_ipproto(uint8_t ipproto);
 int ct_dpif_set_timeout_policy(struct dpif *dpif,
                                const struct ct_dpif_timeout_policy *tp);
 int ct_dpif_get_timeout_policy(struct dpif *dpif,

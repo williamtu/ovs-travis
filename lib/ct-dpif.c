@@ -854,6 +854,16 @@ ct_dpif_free_timeout_policies(struct ovs_list *tps)
     }
 }
 
+bool
+ct_dpif_timeout_policy_support_ipproto(uint8_t ipproto)
+{
+    if (ipproto == IPPROTO_TCP || ipproto == IPPROTO_UDP ||
+        ipproto == IPPROTO_ICMP|| ipproto == IPPROTO_ICMPV6) {
+        return true;
+    }
+    return false;
+}
+
 int
 ct_dpif_set_timeout_policy(struct dpif *dpif,
                            const struct ct_dpif_timeout_policy *tp)
