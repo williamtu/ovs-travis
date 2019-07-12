@@ -34,7 +34,9 @@
 #include "coverage.h"
 #include "dp-packet.h"
 #include "dpif-netdev.h"
+#include "fatal-signal.h"
 #include "openvswitch/dynamic-string.h"
+#include "openvswitch/list.h"
 #include "openvswitch/vlog.h"
 #include "packets.h"
 #include "socket-util.h"
@@ -64,6 +66,57 @@ static void xsk_remove_xdp_program(uint32_t ifindex, int xdpmode);
 static void xsk_destroy(struct xsk_socket_info *xsk);
 static int xsk_configure_all(struct netdev *netdev);
 static void xsk_destroy_all(struct netdev *netdev);
+
+struct unused_pool {
+    struct xsk_umem_info *umem_info;
+    int lost_in_rings; /* Number of packets left in tx, rx, cq and fq. */
+    struct ovs_list list_node;
+};
+
+static struct ovs_mutex unused_pools_mutex = OVS_MUTEX_INITIALIZER;
+static struct ovs_list unused_pools OVS_GUARDED_BY(unused_pools_mutex) =
+    OVS_LIST_INITIALIZER(&unused_pools);
+
+static void
+netdev_afxdp_cleanup_unused_pool(struct unused_pool *pool)
+{
+    /* free the packet buffer */
+    free_pagealign(pool->umem_info->buffer);
+
+    /* cleanup umem pool */
+    umem_pool_cleanup(&pool->umem_info->mpool);
+
+    /* cleanup metadata pool */
+    xpacket_pool_cleanup(&pool->umem_info->xpool);
+
+    free(pool->umem_info);
+}
+
+static void
+netdev_afxdp_sweep_unused_pools(void *aux OVS_UNUSED)
+{
+    struct unused_pool *pool, *next;
+    unsigned int count;
+
+    ovs_mutex_lock(&unused_pools_mutex);
+    LIST_FOR_EACH_SAFE (pool, next, list_node, &unused_pools) {
+
+        count = umem_pool_count(&pool->umem_info->mpool);
+        ovs_assert(count + pool->lost_in_rings <= NUM_FRAMES);
+
+        if (count + pool->lost_in_rings == NUM_FRAMES) {
+            /* OVS doesn't use this memory pool anymore.  Kernel doesn't
+             * use it since closing the xdp socket.  So, it's safe to free
+             * the pool now. */
+            VLOG_DBG("Freeing umem pool at 0x%"PRIxPTR,
+                     (uintptr_t) pool->umem_info);
+            ovs_list_remove(&pool->list_node);
+            netdev_afxdp_cleanup_unused_pool(pool);
+            free(pool);
+        }
+    }
+    ovs_mutex_unlock(&unused_pools_mutex);
+}
 
 static struct xsk_umem_info *
 xsk_configure_umem(void *buffer, uint64_t size, int xdpmode)
@@ -221,6 +274,8 @@ xsk_configure(int ifindex, int xdp_queue_id, int xdpmode)
     struct xsk_umem_info *umem;
     void *bufs;
 
+    netdev_afxdp_sweep_unused_pools(NULL);
+
     /* umem memory region */
     bufs = xmalloc_pagealign(NUM_FRAMES * FRAME_SIZE);
     memset(bufs, 0, NUM_FRAMES * FRAME_SIZE);
@@ -233,6 +288,8 @@ xsk_configure(int ifindex, int xdp_queue_id, int xdpmode)
         free_pagealign(bufs);
         return NULL;
     }
+
+    VLOG_DBG("Allocated umem pool at 0x%"PRIxPTR, (uintptr_t) umem);
 
     xsk = xsk_configure_socket(umem, ifindex, xdp_queue_id, xdpmode);
     if (!xsk) {
@@ -273,6 +330,7 @@ xsk_configure_all(struct netdev *netdev)
         dev->xsks[i] = xsk_info;
         xsk_info->tx_dropped = 0;
         xsk_info->outstanding_tx = 0;
+        xsk_info->available_rx = PROD_NUM_DESCS;
     }
 
     return 0;
@@ -286,6 +344,7 @@ static void
 xsk_destroy(struct xsk_socket_info *xsk_info)
 {
     struct xsk_umem *umem;
+    struct unused_pool *pool;
 
     xsk_socket__delete(xsk_info->xsk);
     xsk_info->xsk = NULL;
@@ -295,17 +354,17 @@ xsk_destroy(struct xsk_socket_info *xsk_info)
         VLOG_ERR("xsk_umem__delete failed");
     }
 
-    /* free the packet buffer */
-    free_pagealign(xsk_info->umem->buffer);
+    pool = xzalloc(sizeof *pool);
+    pool->umem_info = xsk_info->umem;
+    pool->lost_in_rings = xsk_info->outstanding_tx + xsk_info->available_rx;
 
-    /* cleanup umem pool */
-    umem_pool_cleanup(&xsk_info->umem->mpool);
+    ovs_mutex_lock(&unused_pools_mutex);
+    ovs_list_push_back(&unused_pools, &pool->list_node);
+    ovs_mutex_unlock(&unused_pools_mutex);
 
-    /* cleanup metadata pool */
-    xpacket_pool_cleanup(&xsk_info->umem->xpool);
-
-    free(xsk_info->umem);
     free(xsk_info);
+
+    netdev_afxdp_sweep_unused_pools(NULL);
 }
 
 static void
@@ -546,6 +605,7 @@ prepare_fill_queue(struct xsk_socket_info *xsk_info)
         idx_fq++;
     }
     xsk_ring_prod__submit(&umem->fq, BATCH_SIZE);
+    xsk_info->available_rx += BATCH_SIZE;
 }
 
 int
@@ -607,6 +667,7 @@ netdev_afxdp_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch,
     }
     /* Release the RX queue */
     xsk_ring_cons__release(&xsk_info->rx, rcvd);
+    xsk_info->available_rx -= rcvd;
 
     if (qfill) {
         /* TODO: return the number of remaining packets in the queue. */
@@ -865,9 +926,16 @@ netdev_afxdp_rxq_construct(struct netdev_rxq *rxq_ OVS_UNUSED)
 void
 netdev_afxdp_destruct(struct netdev *netdev)
 {
+    static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
     struct netdev_linux *dev = netdev_linux_cast(netdev);
     int n_txqs = netdev_n_rxq(netdev);
     int i;
+
+    if (ovsthread_once_start(&once)) {
+        fatal_signal_add_hook(netdev_afxdp_sweep_unused_pools,
+                              NULL, NULL, true);
+        ovsthread_once_done(&once);
+    }
 
     /* Note: tc is by-passed when using drv-mode, but when using
      * skb-mode, we might need to clean up tc. */

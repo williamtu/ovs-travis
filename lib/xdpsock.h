@@ -80,7 +80,8 @@ struct xsk_socket_info {
     struct xsk_ring_prod tx;
     struct xsk_umem_info *umem;
     struct xsk_socket *xsk;
-    uint32_t outstanding_tx;
+    uint32_t outstanding_tx; /* Number of descriptors filled in tx and cq. */
+    uint32_t available_rx;   /* Number of descriptors filled in rx and fq. */
     atomic_ulong tx_dropped;
 };
 
@@ -96,6 +97,7 @@ int umem_elem_pop_n(struct umem_pool *umemp, int n, void **addrs);
 
 int umem_pool_init(struct umem_pool *umemp, unsigned int size);
 void umem_pool_cleanup(struct umem_pool *umemp);
+unsigned int umem_pool_count(struct umem_pool *umemp);
 int xpacket_pool_init(struct xpacket_pool *xp, unsigned int size);
 void xpacket_pool_cleanup(struct xpacket_pool *xp);
 

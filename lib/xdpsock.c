@@ -147,6 +147,12 @@ umem_pool_cleanup(struct umem_pool *umemp)
     umemp->array = NULL;
 }
 
+unsigned int
+umem_pool_count(struct umem_pool *umemp)
+{
+    return umemp->index;
+}
+
 /* AF_XDP metadata init/destroy */
 int
 xpacket_pool_init(struct xpacket_pool *xp, unsigned int size)
