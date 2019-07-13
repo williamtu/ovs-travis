@@ -140,7 +140,7 @@ if [ "$TESTSUITE" ]; then
 elif [ "$USERSPACE_TESTSUITE" ]; then
     configure_ovs
 
-    if ! make check-system-userspace TESTSUITEFLAGS=-j4 RECHECK=yes; then
+    if ! sudo make check-system-userspace TESTSUITEFLAGS=-j4 RECHECK=yes; then
         # testsuite.log is necessary for debugging.
         cat */_build/tests/system-userspace-testsuite.log
         exit 1
