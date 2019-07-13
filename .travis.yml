@@ -28,6 +28,7 @@ before_script: export PATH=$PATH:$HOME/bin
 
 env:
   - OPTS="--disable-ssl"
+  - USERSPACE_TESTSUITE=1
   - TESTSUITE=1 KERNEL=3.16
   - TESTSUITE=1 OPTS="--enable-shared"
   - BUILD_ENV="-m32" OPTS="--disable-ssl"

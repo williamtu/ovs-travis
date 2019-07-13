@@ -137,6 +137,15 @@ if [ "$TESTSUITE" ]; then
         cat */_build/tests/testsuite.log
         exit 1
     fi
+elif [ "$USERSPACE_TESTSUITE" ]; then
+    configure_ovs
+
+    if ! make check-system-userspace TESTSUITEFLAGS=-j4 RECHECK=yes; then
+        # testsuite.log is necessary for debugging.
+        cat */_build/tests/system-userspace-testsuite.log
+        exit 1
+    fi
+
 else
     configure_ovs $OPTS
     make selinux-policy
