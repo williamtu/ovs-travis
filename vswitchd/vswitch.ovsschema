@@ -1,6 +1,6 @@
 {"name": "Open_vSwitch",
  "version": "8.1.0",
- "cksum": "1566974404 25483",
+ "cksum": "1635647160 26090",
  "tables": {
    "Open_vSwitch": {
      "columns": {
@@ -660,7 +660,15 @@
    "CT_Timeout_Policy": {
      "columns": {
        "timeouts": {
-         "type": {"key": "string",
+         "type": {"key": {"type" : "string",
+                          "enum": ["set", ["tcp_syn_sent", "tcp_syn_recv",
+                                           "tcp_established", "tcp_fin_wait",
+                                           "tcp_close_wait", "tcp_last_ack",
+                                           "tcp_time_wait", "tcp_close",
+                                           "tcp_syn_sent2", "tcp_retransmit",
+                                           "tcp_unack", "udp_first",
+                                           "udp_single", "udp_multiple",
+                                           "icmp_first", "icmp_reply"]]},
                   "value": {"type" : "integer",
                             "minInteger" : 0,
                             "maxInteger" : 4294967295},
