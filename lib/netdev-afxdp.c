@@ -424,10 +424,9 @@ xsk_configure_all(struct netdev *netdev)
 
     /* Configure each queue. */
     for (i = 0; i < n_rxq; i++) {
-        VLOG_INFO("%s: configure queue %d mode %s use_need_wakeup %s.",
-                  __func__, i,
-                  dev->xdpmode == XDP_COPY ? "SKB" : "DRV",
-                  dev->use_need_wakeup ? "true" : "false");
+        VLOG_DBG("Configure queue %d mode %s use_need_wakeup %s.",
+                 i, dev->xdpmode == XDP_COPY ? "SKB" : "DRV",
+                 dev->use_need_wakeup ? "true" : "false");
         xsk_info = xsk_configure(ifindex, i, dev->xdpmode,
                                  dev->use_need_wakeup);
         if (!xsk_info) {
@@ -545,8 +544,10 @@ netdev_afxdp_set_config(struct netdev *netdev, const struct smap *args,
     }
 
     need_wakeup = smap_get_bool(args, "use_need_wakeup", true);
-    if (need_wakeup && !HAVE_XDP_NEED_WAKEUP) {
+    if (need_wakeup) {
+#ifndef HAVE_XDP_NEED_WAKEUP
         VLOG_WARN("XDP need_wakeup is not supported in libbpf.");
+#endif
     }
 
     if (dev->requested_n_rxq != new_n_rxq
@@ -569,9 +570,9 @@ netdev_afxdp_get_config(const struct netdev *netdev, struct smap *args)
     ovs_mutex_lock(&dev->mutex);
     smap_add_format(args, "n_rxq", "%d", netdev->n_rxq);
     smap_add_format(args, "xdpmode", "%s",
-        dev->xdpmode == XDP_ZEROCOPY ? "drv" : "skb");
+                    dev->xdpmode == XDP_ZEROCOPY ? "drv" : "skb");
     smap_add_format(args, "use_need_wakeup", "%s",
-        dev->use_need_wakeup ? "true" : "false");
+                    dev->use_need_wakeup ? "true" : "false");
     ovs_mutex_unlock(&dev->mutex);
     return 0;
 }

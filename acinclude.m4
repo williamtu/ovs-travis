@@ -280,10 +280,7 @@ AC_DEFUN([OVS_CHECK_LINUX_AF_XDP], [
     AC_CHECK_DECL([xsk_ring_prod__needs_wakeup], [
       AC_DEFINE([HAVE_XDP_NEED_WAKEUP], [1],
         [XDP need wakeup support detected in xsk.h.])
-    ], [
-      AC_DEFINE([HAVE_XDP_NEED_WAKEUP], [0],
-        [XDP need wakeup support not detected in xsk.h.])
-      ], [#include <bpf/xsk.h>])
+    ], [], [[#include <bpf/xsk.h>]])
   fi
   AM_CONDITIONAL([HAVE_AF_XDP], test "$AF_XDP_ENABLE" = true)
 ])
