@@ -1405,8 +1405,11 @@ netdev_linux_get_numa_id(const struct netdev *netdev_)
         return netdev->numa_id;
     }
 
+    netdev->numa_id = 0;
+    netdev->cache_valid |= VALID_NUMA_ID;
+
     name = netdev_get_name(netdev_);
-    if (strchr(name, '/') || strchr(name, '\\')) {
+    if (strpbrk(name, "/\\")) {
         VLOG_ERR_RL(&rl, "\"%s\" is not a valid name for a port. "
                     "A valid name must not include '/' or '\\'."
                     "Using numa_id 0", name);
@@ -1421,7 +1424,6 @@ netdev_linux_get_numa_id(const struct netdev *netdev_)
         VLOG_INFO_RL(&rl, "%s: Can't open '%s': %s, using numa_id 0",
                      name, numa_node_path, ovs_strerror(errno));
         free(numa_node_path);
-        netdev->cache_valid |= VALID_NUMA_ID;
         return 0;
     }
 
@@ -1434,7 +1436,6 @@ netdev_linux_get_numa_id(const struct netdev *netdev_)
     }
 
     netdev->numa_id = node_id;
-    netdev->cache_valid |= VALID_NUMA_ID;
     fclose(stream);
     free(numa_node_path);
     return node_id;
