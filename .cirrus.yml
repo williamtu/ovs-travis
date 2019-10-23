@@ -1,12 +1,14 @@
-freebsd_build_task:
+gcp_credentials: ENCRYPTED[d2a8b5db42decced1d2dede9f93b42be1e1a5a8bd3bcb8a1b01c65cee403460c0978ef402b7a0a4f8c139f01fbf0674f]
 
-  freebsd_instance:
-    matrix:
-      image_family: freebsd-12-0-snap
-      image_family: freebsd-11-3-snap
-    cpu: 4
-    memory: 8G
+gce_instance:
+  image_project: ubuntu-os-cloud
+  image_name: ubuntu-1904-disco-v20190417
+  zone: us-central1-a
+  cpu: 2
+  memory: 40GB
+  disk: 20
 
+task:
   env:
     DEPENDENCIES: automake libtool gmake gcc wget openssl
                   python3 py36-six py36-openssl py36-sphinx
@@ -22,11 +24,3 @@ freebsd_build_task:
     - ./boot.sh
     - ./configure CC=${COMPILER} CFLAGS="-g -O2 -Wall"
                   MAKE=gmake --enable-Werror
-                  || { cat config.log; exit 1; }
-
-  build_script:
-    - gmake -j8
-
-  check_script:
-    - gmake -j8 check TESTSUITEFLAGS=-j8 RECHECK=yes
-                || { cat ./tests/testsuite.log; exit 1; }
