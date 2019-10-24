@@ -1,4 +1,6 @@
-gcp_credentials: ENCRYPTED[d2a8b5db42decced1d2dede9f93b42be1e1a5a8bd3bcb8a1b01c65cee403460c0978ef402b7a0a4f8c139f01fbf0674f]
+
+
+gcp_credentials: ENCRYPTED[aa6d813a32478438735d99897709d6851dc57c49]
 
 gce_instance:
   image_project: ubuntu-os-cloud
@@ -10,11 +12,11 @@ gce_instance:
 
 task:
   env:
-    DEPENDENCIES: automake libtool gmake gcc wget openssl
+    DEPENDENCIES: automake libtool gmake gcc wget openssl \
                   python3 py36-six py36-openssl py36-sphinx
     matrix:
-      COMPILER: gcc
-      COMPILER: clang
+      - COMPILER: gcc
+      - COMPILER: clang
 
   prepare_script:
     - sysctl -w kern.coredump=0
@@ -22,5 +24,5 @@ task:
 
   configure_script:
     - ./boot.sh
-    - ./configure CC=${COMPILER} CFLAGS="-g -O2 -Wall"
+    - ./configure CC=${COMPILER} CFLAGS="-g -O2 -Wall" \
                   MAKE=gmake --enable-Werror
