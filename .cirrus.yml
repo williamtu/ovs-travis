@@ -4,10 +4,10 @@ gcp_credentials: ENCRYPTED[3d11b332216bbaa5cfb20219d2e2127c5d8b6d4448f8c87cf9046
 
 gce_instance:
   image_project: ubuntu-os-cloud
-  image_name: ubuntu-1904-disco-v20190417
-  zone: us-central1-a
-  cpu: 2
-  memory: 4GB
+  image_name: ubuntu-1910
+  zone: us-west2-a
+  cpu: 1
+  memory: 2GB
   disk: 20
 
 task:
