@@ -7,7 +7,7 @@ gce_instance:
   image_name: ubuntu-1904-disco-v20190417
   zone: us-central1-a
   cpu: 2
-  memory: 40GB
+  memory: 4GB
   disk: 20
 
 task:
