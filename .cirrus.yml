@@ -4,25 +4,24 @@ gcp_credentials: ENCRYPTED[3d11b332216bbaa5cfb20219d2e2127c5d8b6d4448f8c87cf9046
 
 gce_instance:
   image_project: ubuntu-os-cloud
-  image_name: ubuntu-1910
+  image_name: ubuntu-1904
   zone: us-west2-a
-  cpu: 1
-  memory: 2GB
+  cpu: 2
+  memory: 4GB
   disk: 20
 
 task:
   env:
-    DEPENDENCIES: automake libtool gmake gcc wget openssl \
-                  python3 py36-six py36-openssl py36-sphinx
-    matrix:
-      - COMPILER: gcc
-      - COMPILER: clang
+    DEPENDENCIES: bc gcc-multilib libssl-dev llvm-dev libjemalloc1 libjemalloc-dev \
+                  libnuma-dev python3-sphinx libelf-dev selinux-policy-dev \
+                  libunbound-dev libunbound-dev:i386 libunwind-dev
+    COMPILER: gcc
 
   prepare_script:
-    - sysctl -w kern.coredump=0
-    - pkg install -y ${DEPENDENCIES}
+    - pip install --disable-pip-version-check --user six flake8 hacking
+    - pip install --user --upgrade docutils
 
   configure_script:
     - ./boot.sh
     - ./configure CC=${COMPILER} CFLAGS="-g -O2 -Wall" \
-                  MAKE=gmake --enable-Werror
+                  --enable-Werror --enable-afxdp
