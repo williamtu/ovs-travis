@@ -14,7 +14,7 @@ task:
   env:
     DEPENDENCIES: bc gcc-multilib libssl-dev llvm-dev libjemalloc1 libjemalloc-dev \
                   libnuma-dev python3-sphinx libelf-dev selinux-policy-dev \
-                  libunbound-dev libunbound-dev:i386 libunwind-dev
+                  libunbound-dev libunbound-dev:i386 libunwind-dev python3-pip
     COMPILER: gcc
 
   prepare_script:
