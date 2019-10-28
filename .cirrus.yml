@@ -18,6 +18,7 @@ task:
     COMPILER: gcc
 
   prepare_script:
+    - apt-get install -y ${DEPENDENCIES}
     - pip install --disable-pip-version-check --user six flake8 hacking
     - pip install --user --upgrade docutils
 
