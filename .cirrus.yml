@@ -1,6 +1,6 @@
 
 
-gcp_credentials: ENCRYPTED[547d86a94ee80027a454514b8219eae31cde752c4ba83ae642146ceef8305a8d03df9411a42beda134b4b9b901497b64]
+gcp_credentials: ENCRYPTED[6c48ba8820740593dca045f1e88f7be4740aede2f21387184bf9d029e21a9988e9e0315d69d9bec3ffd7a34b837d44e3] 
 
 gce_instance:
   image_project: ubuntu-os-cloud
