@@ -37,4 +37,4 @@ task:
     - ./configure CC=${COMPILER} CFLAGS="-g -O2 -Wall" \
                   --enable-Werror --enable-afxdp
     - make -j2
-    - make check-afxdp 
+    - sudo make check-afxdp 
