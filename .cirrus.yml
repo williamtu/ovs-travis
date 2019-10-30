@@ -2,7 +2,7 @@ gcp_credentials: ENCRYPTED[0d68e33902f5a9ced6118c84fc6bf50178366b0806ea033cf6220
 
 gce_instance:
   image_project: ubuntu-os-cloud
-  image_name: ubuntu-1904-disco-v20190417 
+  image_name: ubuntu-1910-eoan-v20191022
   zone: us-west2-a
   cpu: 2
   memory: 4GB
@@ -10,9 +10,9 @@ gce_instance:
 
 task:
   env:
-    DEPENDENCIES: bc gcc-multilib libssl-dev llvm-dev libjemalloc1 libjemalloc-dev \
-                  libnuma-dev python3-sphinx libelf-dev selinux-policy-dev \
-                  libunbound-dev libunbound-dev:i386 libunwind-dev python3-pip
+    DEPENDENCIES: bc gcc-multilib libssl-dev llvm-dev
+                  libnuma-dev python3-sphinx libelf-dev selinux-policy-dev
+                  libunbound-dev libunwind-dev python3-pip
     COMPILER: gcc
 
   prepare_script:
