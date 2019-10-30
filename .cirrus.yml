@@ -12,17 +12,23 @@ task:
   env:
     DEPENDENCIES: bc gcc-multilib libssl-dev llvm-dev
                   libnuma-dev python3-sphinx libelf-dev selinux-policy-dev
-                  libunbound-dev libunwind-dev python3-pip
+                  libunbound-dev libunwind-dev python3-pip libelf-dev
     COMPILER: gcc
 
   prepare_script:
     - cat /etc/lsb-release
     - sudo apt-get update 
     - sudo apt-get install -y ${DEPENDENCIES}
-    - pip install --disable-pip-version-check --user six flake8 hacking
-    - pip install --user --upgrade docutils
+    - sudo apt-get install -y linux-source-5.3.0
+    - cd /usr/src/linux-source-5.3.0; sudo bunzip2 linux-source-5.3.0.tar.bz2;sudo tar xvf linux-source-5.3.0.tar
+    - cd /usr/src/linux-source-5.3.0/linux-source-5.3.0/; sudo make headers_install INSTALL_HDR_PATH=/usr
+    - cd /usr/src/linux-source-5.3.0/linux-source-5.3.0/tools/lib/bpf; sudo make install; sudo make install_headers; sudo ldconfig
+    - pip3 install --disable-pip-version-check --user six flake8 hacking
+    - pip3 install --user --upgrade docutils
+
 
   configure_script:
     - ./boot.sh
     - ./configure CC=${COMPILER} CFLAGS="-g -O2 -Wall" \
                   --enable-Werror --enable-afxdp
+    - make -j2
