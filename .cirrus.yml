@@ -23,11 +23,17 @@ task:
     - sudo apt-get update 
     - sudo apt-get install -y ${DEPENDENCIES}
     - sudo apt-get install -y linux-source-5.3.0
-    - cd /usr/src/linux-source-5.3.0; sudo bunzip2 linux-source-5.3.0.tar.bz2;sudo tar xvf linux-source-5.3.0.tar
-    - cd /usr/src/linux-source-5.3.0/linux-source-5.3.0/; sudo make headers_install INSTALL_HDR_PATH=/usr
-    - cd /usr/src/linux-source-5.3.0/linux-source-5.3.0/tools/lib/bpf; sudo make install; sudo make install_headers;
-    - sudo touch /etc/ld.so.conf.d/libbpf.conf; sudo chmod a+w /etc/ld.so.conf.d/libbpf.conf;
-    - sudo echo "/usr/local/lib64/" >> /etc/ld.so.conf.d/libbpf.conf; sudo ldconfig
+    - cd /usr/src/linux-source-5.3.0;
+      sudo bunzip2 linux-source-5.3.0.tar.bz2;
+      sudo tar xvf linux-source-5.3.0.tar
+    - cd /usr/src/linux-source-5.3.0/linux-source-5.3.0/;
+      sudo make headers_install INSTALL_HDR_PATH=/usr
+    - cd /usr/src/linux-source-5.3.0/linux-source-5.3.0/tools/lib/bpf;
+      sudo make install; sudo make install_headers;
+    - sudo touch /etc/ld.so.conf.d/libbpf.conf;
+      sudo chmod a+w /etc/ld.so.conf.d/libbpf.conf;
+    - sudo echo "/usr/local/lib64/" >> /etc/ld.so.conf.d/libbpf.conf;
+      sudo ldconfig
     - ldconfig -p | grep libbpf
     - pip3 install --disable-pip-version-check --user six flake8 hacking
     - pip3 install --user --upgrade docutils
