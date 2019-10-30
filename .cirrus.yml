@@ -36,5 +36,9 @@ task:
   configure_script:
     - ./boot.sh
     - ./configure CC=${COMPILER} CFLAGS="-g -O2 -Wall" --enable-Werror --enable-afxdp
+
+  build_script:
     - make -j2
-    - sudo make check-afxdp 
+
+  check_script:
+    - sudo make check-afxdp
