@@ -17,7 +17,7 @@ task:
 
   prepare_script:
     - cat /etc/lsb-release
-    - cat /etc/lsb-release
+    - sudo apt-get update 
     - sudo apt-get install -y ${DEPENDENCIES}
     - pip install --disable-pip-version-check --user six flake8 hacking
     - pip install --user --upgrade docutils
