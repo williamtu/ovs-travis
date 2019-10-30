@@ -15,6 +15,7 @@ task:
                   libunbound-dev libunwind-dev python3-pip libelf-dev
                   autoconf automake libtool
                   libcap-ng-dev libssl-dev python3-dev
+                  build-essential
     COMPILER: gcc
 
   prepare_script:
@@ -34,6 +35,7 @@ task:
 
   configure_script:
     - ./boot.sh
+    - autoreconf --install
     - ./configure CC=${COMPILER} CFLAGS="-g -O2 -Wall" \
                   --enable-Werror --enable-afxdp
     - make -j2
