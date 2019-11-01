@@ -47,4 +47,4 @@ task:
     - make -j2
 
   check_script:
-    - sudo make check-afxdp
+    - sudo make check-afxdp RECHECK=yes
