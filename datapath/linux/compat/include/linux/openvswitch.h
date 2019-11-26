@@ -236,6 +236,7 @@ enum ovs_vport_type {
 	OVS_VPORT_TYPE_GRE,      /* GRE tunnel. */
 	OVS_VPORT_TYPE_VXLAN,	 /* VXLAN tunnel. */
 	OVS_VPORT_TYPE_GENEVE,	 /* Geneve tunnel. */
+	OVS_VPORT_TYPE_GTPU,     /* GTPU tunnel. */
 	OVS_VPORT_TYPE_LISP = 105,  /* LISP tunnel */
 	OVS_VPORT_TYPE_STT = 106, /* STT tunnel */
 	__OVS_VPORT_TYPE_MAX
@@ -394,6 +395,8 @@ enum ovs_tunnel_key_attr {
 	OVS_TUNNEL_KEY_ATTR_VXLAN_OPTS,		/* Nested OVS_VXLAN_EXT_* */
 	OVS_TUNNEL_KEY_ATTR_IPV6_SRC,		/* struct in6_addr src IPv6 address. */
 	OVS_TUNNEL_KEY_ATTR_IPV6_DST,		/* struct in6_addr dst IPv6 address. */
+	OVS_TUNNEL_KEY_ATTR_GTPU_FLAGS,         /* u8 GTP-U FLAGS. */
+	OVS_TUNNEL_KEY_ATTR_GTPU_MSGTYPE,       /* u8 GTP-U MSGTYPE. */
 	OVS_TUNNEL_KEY_ATTR_PAD,
 	__OVS_TUNNEL_KEY_ATTR_MAX
 };

@@ -320,6 +320,27 @@ match_set_tun_gbp_flags(struct match *match, uint8_t flags)
 }
 
 void
+match_set_tun_gtpu_flags(struct match *match, uint8_t gtpu_flags)
+{
+    match_set_tun_gtpu_flags_masked(match, gtpu_flags, UINT8_MAX);
+}
+
+void
+match_set_tun_gtpu_flags_masked(struct match *match, uint8_t gtpu_flags,
+                                uint8_t mask)
+{
+    match->wc.masks.tunnel.gtpu_flags = mask;
+    match->flow.tunnel.gtpu_flags = gtpu_flags & mask;
+}
+
+void
+match_set_tun_gtpu_msgtype(struct match *match, uint8_t gtpu_msgtype)
+{
+    match->flow.tunnel.gtpu_msgtype = gtpu_msgtype;
+    match->wc.masks.tunnel.gtpu_msgtype = UINT8_MAX;
+}
+
+void
 match_set_in_port(struct match *match, ofp_port_t ofp_port)
 {
     match->wc.masks.in_port.ofp_port = u16_to_ofp(UINT16_MAX);
@@ -1239,6 +1260,14 @@ format_flow_tunnel(struct ds *s, const struct match *match)
                             FLOW_TNL_F_MASK);
         ds_put_char(s, ',');
     }
+
+    if (wc->masks.tunnel.gtpu_flags) {
+        ds_put_format(s, "tun_gtpu_flags=%"PRIx8",", tnl->gtpu_flags);
+    }
+    if (wc->masks.tunnel.gtpu_msgtype) {
+        ds_put_format(s, "tun_gtpu_msgtype=%"PRIu8",", tnl->gtpu_msgtype);
+    }
+
     tun_metadata_match_format(s, match);
 }
 

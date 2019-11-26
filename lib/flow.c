@@ -695,6 +695,13 @@ miniflow_extract(struct dp_packet *packet, struct miniflow *dst)
         miniflow_push_be32(mf, packet_type, packet_type);
     }
 
+    /* It won't be parsed if the packet contains application layer data only.
+     * These include, but not limited to GTP-U messages, GTP-C packets.
+     */
+    if (packet_type == htonl(PT_GTPU_MSG)) {
+        goto out;
+    }
+
     /* Initialize packet's layer pointer and offsets. */
     frame = data;
     dp_packet_reset_offsets(packet);

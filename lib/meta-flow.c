@@ -231,6 +231,10 @@ mf_is_all_wild(const struct mf_field *mf, const struct flow_wildcards *wc)
         return !wc->masks.tunnel.gbp_id;
     case MFF_TUN_GBP_FLAGS:
         return !wc->masks.tunnel.gbp_flags;
+    case MFF_TUN_GTPU_FLAGS:
+        return !wc->masks.tunnel.gtpu_flags;
+    case MFF_TUN_GTPU_MSGTYPE:
+        return !wc->masks.tunnel.gtpu_msgtype;
     CASE_MFF_TUN_METADATA:
         return !ULLONG_GET(wc->masks.tunnel.metadata.present.map,
                            mf->id - MFF_TUN_METADATA0);
@@ -513,6 +517,7 @@ mf_is_value_valid(const struct mf_field *mf, const union mf_value *value)
     case MFF_TUN_TTL:
     case MFF_TUN_GBP_ID:
     case MFF_TUN_GBP_FLAGS:
+    case MFF_TUN_GTPU_MSGTYPE:
     CASE_MFF_TUN_METADATA:
     case MFF_METADATA:
     case MFF_IN_PORT:
@@ -625,6 +630,9 @@ mf_is_value_valid(const struct mf_field *mf, const union mf_value *value)
     case MFF_NSH_C4:
         return true;
 
+    case MFF_TUN_GTPU_FLAGS:
+        return (value->u8 == GTPU_FLAGS_DEFAULT);
+
     case MFF_N_IDS:
     default:
         OVS_NOT_REACHED();
@@ -673,6 +681,12 @@ mf_get_value(const struct mf_field *mf, const struct flow *flow,
         break;
     case MFF_TUN_GBP_FLAGS:
         value->u8 = flow->tunnel.gbp_flags;
+        break;
+    case MFF_TUN_GTPU_FLAGS:
+        value->u8 = flow->tunnel.gtpu_flags;
+        break;
+    case MFF_TUN_GTPU_MSGTYPE:
+        value->u8 = flow->tunnel.gtpu_msgtype;
         break;
     case MFF_TUN_TTL:
         value->u8 = flow->tunnel.ip_ttl;
@@ -988,6 +1002,12 @@ mf_set_value(const struct mf_field *mf,
     case MFF_TUN_GBP_FLAGS:
          match_set_tun_gbp_flags(match, value->u8);
          break;
+    case MFF_TUN_GTPU_FLAGS:
+        match_set_tun_gtpu_flags(match, value->u8);
+        break;
+    case MFF_TUN_GTPU_MSGTYPE:
+        match_set_tun_gtpu_msgtype(match, value->u8);
+        break;
     case MFF_TUN_TOS:
         match_set_tun_tos(match, value->u8);
         break;
@@ -1385,6 +1405,12 @@ mf_set_flow_value(const struct mf_field *mf,
     case MFF_TUN_GBP_FLAGS:
         flow->tunnel.gbp_flags = value->u8;
         break;
+    case MFF_TUN_GTPU_FLAGS:
+        flow->tunnel.gtpu_flags = value->u8;
+        break;
+    case MFF_TUN_GTPU_MSGTYPE:
+        flow->tunnel.gtpu_msgtype = value->u8;
+        break;
     case MFF_TUN_TOS:
         flow->tunnel.ip_tos = value->u8;
         break;
@@ -1700,6 +1726,8 @@ mf_is_pipeline_field(const struct mf_field *mf)
     case MFF_TUN_FLAGS:
     case MFF_TUN_GBP_ID:
     case MFF_TUN_GBP_FLAGS:
+    case MFF_TUN_GTPU_FLAGS:
+    case MFF_TUN_GTPU_MSGTYPE:
     CASE_MFF_TUN_METADATA:
     case MFF_METADATA:
     case MFF_IN_PORT:
@@ -1869,6 +1897,14 @@ mf_set_wild(const struct mf_field *mf, struct match *match, char **err_str)
         break;
     case MFF_TUN_GBP_FLAGS:
         match_set_tun_gbp_flags_masked(match, 0, 0);
+        break;
+    case MFF_TUN_GTPU_FLAGS:
+        match->wc.masks.tunnel.gtpu_flags = 0;
+        match->flow.tunnel.gtpu_flags = 0;
+        break;
+    case MFF_TUN_GTPU_MSGTYPE:
+        match->wc.masks.tunnel.gtpu_msgtype = 0;
+        match->flow.tunnel.gtpu_msgtype = 0;
         break;
     case MFF_TUN_TOS:
         match_set_tun_tos_masked(match, 0, 0);
@@ -2221,6 +2257,7 @@ mf_set(const struct mf_field *mf,
     case MFF_ICMPV4_CODE:
     case MFF_ICMPV6_TYPE:
     case MFF_ICMPV6_CODE:
+    case MFF_TUN_GTPU_MSGTYPE:
         return OFPUTIL_P_NONE;
 
     case MFF_DP_HASH:
@@ -2249,6 +2286,9 @@ mf_set(const struct mf_field *mf,
         break;
     case MFF_TUN_GBP_FLAGS:
         match_set_tun_gbp_flags_masked(match, value->u8, mask->u8);
+        break;
+    case MFF_TUN_GTPU_FLAGS:
+        match_set_tun_gtpu_flags_masked(match, value->u8, mask->u8);
         break;
     case MFF_TUN_TTL:
         match_set_tun_ttl_masked(match, value->u8, mask->u8);

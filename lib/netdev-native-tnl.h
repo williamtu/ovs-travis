@@ -58,6 +58,18 @@ netdev_vxlan_build_header(const struct netdev *netdev,
 struct dp_packet *
 netdev_vxlan_pop_header(struct dp_packet *packet);
 
+void
+netdev_gtpu_push_header(struct dp_packet *packet,
+                        const struct ovs_action_push_tnl *data);
+
+int
+netdev_gtpu_build_header(const struct netdev *netdev,
+                         struct ovs_action_push_tnl *data,
+                         const struct netdev_tnl_build_header_params *params);
+
+struct dp_packet *
+netdev_gtpu_pop_header(struct dp_packet *packet);
+
 static inline bool
 netdev_tnl_is_header_ipv6(const void *header)
 {

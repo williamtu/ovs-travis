@@ -384,6 +384,12 @@ tnl_wc_init(struct flow *flow, struct flow_wildcards *wc)
         wc->masks.tunnel.tp_src = 0;
         wc->masks.tunnel.tp_dst = 0;
 
+        /* GTP-U header are set to be always unwildcarded for GTP-U packets*/
+        if (flow->tunnel.gtpu_flags || flow->tunnel.gtpu_msgtype) {
+            wc->masks.tunnel.gtpu_flags = UINT8_MAX;
+            wc->masks.tunnel.gtpu_msgtype = UINT8_MAX;
+        }
+
         if (is_ip_any(flow)
             && IP_ECN_is_ce(flow->tunnel.ip_tos)) {
             wc->masks.nw_tos |= IP_ECN_MASK;
@@ -569,7 +575,8 @@ tnl_find(const struct flow *flow) OVS_REQ_RDLOCK(rwlock)
                     match.ip_src_flow = ip_src == IP_SRC_FLOW;
 
                     /* Look for a legacy L2 or L3 tunnel port first. */
-                    if (pt_ns(flow->packet_type) == OFPHTN_ETHERTYPE) {
+                    if (pt_ns(flow->packet_type) == OFPHTN_ETHERTYPE ||
+                        flow->packet_type == htonl(PT_GTPU_MSG)) {
                         match.pt_mode = NETDEV_PT_LEGACY_L3;
                     } else {
                         match.pt_mode = NETDEV_PT_LEGACY_L2;

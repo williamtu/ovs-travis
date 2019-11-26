@@ -55,6 +55,9 @@ static struct vlog_rate_limit err_rl = VLOG_RATE_LIMIT_INIT(60, 5);
 #define GENEVE_BASE_HLEN   (sizeof(struct udp_header) +         \
                             sizeof(struct genevehdr))
 
+#define GTPU_HLEN   (sizeof(struct udp_header) +        \
+                     sizeof(struct gtpuhdr))
+
 uint16_t tnl_udp_port_min = 32768;
 uint16_t tnl_udp_port_max = 61000;
 
@@ -715,7 +718,147 @@ netdev_geneve_build_header(const struct netdev *netdev,
     return 0;
 }
 
-
+void
+netdev_gtpu_push_header(struct dp_packet *packet,
+                        const struct ovs_action_push_tnl *data)
+{
+    struct udp_header *udp;
+    struct gtpuhdr *gtph;
+    int gtpu_len;
+    int ip_tot_size;
+
+    gtpu_len = dp_packet_size(packet);
+
+    udp = netdev_tnl_push_ip_header(packet, data->header, data->header_len,
+                                    &ip_tot_size);
+    udp->udp_len = htons(ip_tot_size);
+
+    gtph = (struct gtpuhdr *)(udp + 1);
+    gtph->len = htons(gtpu_len);
+
+    if (udp->udp_csum) {
+        uint32_t csum;
+        if (netdev_tnl_is_header_ipv6(dp_packet_data(packet))) {
+            csum = packet_csum_pseudoheader6(
+                       netdev_tnl_ipv6_hdr(dp_packet_data(packet)));
+        } else {
+            csum = packet_csum_pseudoheader(
+                       netdev_tnl_ip_hdr(dp_packet_data(packet)));
+        }
+
+        csum = csum_continue(csum, udp, ip_tot_size);
+        udp->udp_csum = csum_finish(csum);
+
+        if (!udp->udp_csum) {
+            udp->udp_csum = htons(0xffff);
+        }
+    }
+
+    packet->packet_type = htonl(PT_ETH);
+}
+
+
+int
+netdev_gtpu_build_header(const struct netdev *netdev,
+                          struct ovs_action_push_tnl *data,
+                          const struct netdev_tnl_build_header_params *params)
+{
+    struct netdev_vport *dev = netdev_vport_cast(netdev);
+    struct netdev_tunnel_config *tnl_cfg;
+    struct gtpuhdr *gtph;
+    struct udp_header *udp;
+
+    /* XXX: RCUfy tnl_cfg. */
+    ovs_mutex_lock(&dev->mutex);
+
+    tnl_cfg = &dev->tnl_cfg;
+    udp = netdev_tnl_ip_build_header(data, params, IPPROTO_UDP);
+    udp->udp_dst = tnl_cfg->dst_port;
+    udp->udp_src = htons(GTPU_DST_PORT);
+
+    if (params->is_ipv6 || params->flow->tunnel.flags & FLOW_TNL_F_CSUM) {
+        /* Write a value in now to mark that we should compute the checksum
+         * later. 0xffff is handy because it is transparent to the
+         * calculation. */
+        udp->udp_csum = htons(0xffff);
+    }
+
+    ovs_mutex_unlock(&dev->mutex);
+    data->header_len += sizeof *udp;
+
+    gtph = (struct gtpuhdr *)(udp + 1);
+    gtph->flags = params->flow->tunnel.gtpu_flags;
+    gtph->msgtype = params->flow->tunnel.gtpu_msgtype;
+
+    put_16aligned_be32(&gtph->teid,
+                       htonl(ntohll(params->flow->tunnel.tun_id)));
+    data->header_len += sizeof *gtph;
+    data->tnl_type = OVS_VPORT_TYPE_GTPU;
+    return 0;
+}
+
+struct dp_packet *
+netdev_gtpu_pop_header(struct dp_packet *packet)
+{
+    struct pkt_metadata *md = &packet->md;
+    struct flow_tnl *tnl = &md->tunnel;
+    struct gtpuhdr *gtph;
+    unsigned int hlen;
+
+    pkt_metadata_init_tnl(md);
+    if (GTPU_HLEN > dp_packet_l4_size(packet)) {
+        VLOG_WARN_RL(&err_rl, "GTP-U packet too small: min header=%u "
+                              "packet size=%"PRIuSIZE"\n",
+                     (unsigned int)GTPU_HLEN, dp_packet_l4_size(packet));
+        goto err;
+    }
+
+    gtph = udp_extract_tnl_md(packet, tnl, &hlen);
+    if (!gtph) {
+        goto err;
+    }
+
+    if (gtph->flags == 0x30) {
+    /* Only GTP-U v1 packets without optional fileds are processed, i.e.
+     *     8   7   6  5    4   3   2   1
+     *    |   ver   | PT | 0 | E | S | PN |
+     *     0   0   1  1    0   0   0   0
+     */
+        tnl->gtpu_flags = gtph->flags;
+    } else {
+        goto err;
+    }
+    tnl->gtpu_msgtype = gtph->msgtype;
+    tnl->tun_id = htonll(ntohl(get_16aligned_be32(&gtph->teid)));
+
+    /*Figure out whether the inner packet is IPv4, IPv6 or a GTP-U message.*/
+    if (tnl->gtpu_msgtype == GTPU_MSGTYPE_GPDU) {
+        struct ip_header *ip;
+
+        ip = (struct ip_header *)(gtph + 1);
+        if (IP_VER(ip->ip_ihl_ver) == 4) {
+            packet->packet_type = htonl(PT_IPV4);
+        } else if (IP_VER(ip->ip_ihl_ver) == 6) {
+            packet->packet_type = htonl(PT_IPV6);
+        } else {
+            goto err;
+        }
+    } else {
+        /* GTP-U messages, including echo request, end marker, etc.
+         * OVS will be kicking it to a control-plane entity if properly
+         * configured.
+         */
+        packet->packet_type = htonl(PT_GTPU_MSG);
+    }
+
+    dp_packet_reset_packet(packet, hlen + GTPU_HLEN);
+
+    return packet;
+err:
+    dp_packet_delete(packet);
+    return NULL;
+}
+
 void
 netdev_tnl_egress_port_range(struct unixctl_conn *conn, int argc,
                              const char *argv[], void *aux OVS_UNUSED)

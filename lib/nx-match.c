@@ -1153,6 +1153,10 @@ nx_put_raw(struct ofpbuf *b, enum ofp_version oxm, const struct match *match,
                 flow->tunnel.gbp_id, match->wc.masks.tunnel.gbp_id);
     nxm_put_8m(&ctx, MFF_TUN_GBP_FLAGS, oxm,
                flow->tunnel.gbp_flags, match->wc.masks.tunnel.gbp_flags);
+    nxm_put_8m(&ctx, MFF_TUN_GTPU_FLAGS, oxm, flow->tunnel.gtpu_flags,
+               match->wc.masks.tunnel.gtpu_flags);
+    nxm_put_8m(&ctx, MFF_TUN_GTPU_MSGTYPE, oxm, flow->tunnel.gtpu_msgtype,
+               match->wc.masks.tunnel.gtpu_msgtype);
     tun_metadata_to_nx_match(b, oxm, match);
 
     /* Network Service Header */

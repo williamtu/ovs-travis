@@ -712,6 +712,15 @@ format_odp_tnl_push_header(struct ds *ds, struct ovs_action_push_tnl *data)
             options++;
         }
         ds_put_format(ds, ")");
+    } else if (data->tnl_type == OVS_VPORT_TYPE_GTPU) {
+        const struct gtpuhdr *gtph;
+
+        gtph = format_udp_tnl_push_header(ds, udp);
+
+        ds_put_format(ds, "gtpu(flags=0x%"PRIx8
+                          ",msgtype=0x%"PRIx8",teid=0x%"PRIx32")",
+                      gtph->flags, gtph->msgtype,
+                      ntohl(get_16aligned_be32(&gtph->teid)));
     }
     ds_put_format(ds, ")");
 }
@@ -1474,6 +1483,7 @@ ovs_parse_tnl_push(const char *s, struct ovs_action_push_tnl *data)
     if (ovs_scan_len(s, &n, "udp(src=%"SCNi16",dst=%"SCNi16",csum=0x%"SCNx16"),",
                      &udp_src, &udp_dst, &csum)) {
         uint32_t vx_flags, vni;
+        uint8_t gtpu_flags, gtpu_msgtype;
 
         udp->udp_src = htons(udp_src);
         udp->udp_dst = htons(udp_dst);
@@ -1528,6 +1538,17 @@ ovs_parse_tnl_push(const char *s, struct ovs_action_push_tnl *data)
             gnh->proto_type = htons(ETH_TYPE_TEB);
             put_16aligned_be32(&gnh->vni, htonl(vni << 8));
             tnl_type = OVS_VPORT_TYPE_GENEVE;
+        } else if (ovs_scan_len(s, &n, "gtpu(flags=0x%"SCNx8",msgtype=0x%"
+                                       SCNx8",teid=0x%"SCNx32"))",
+                                &gtpu_flags, &gtpu_msgtype, &vni)) {
+            struct gtpuhdr *gtph = (struct gtpuhdr *) (udp + 1);
+
+            gtph->flags = gtpu_flags;
+            gtph->msgtype = gtpu_msgtype;
+            put_16aligned_be32(&gtph->teid, htonl(vni));
+            tnl_type = OVS_VPORT_TYPE_GTPU;
+            header_len = sizeof *eth + ip_len +
+                         sizeof *udp + sizeof *gtph;
         } else {
             return -EINVAL;
         }
@@ -2373,6 +2394,8 @@ static const struct attr_len_tbl ovs_tun_key_attr_lens[OVS_TUNNEL_KEY_ATTR_MAX +
     [OVS_TUNNEL_KEY_ATTR_VXLAN_OPTS]    = { .len = ATTR_LEN_NESTED,
                                             .next = ovs_vxlan_ext_attr_lens ,
                                             .next_max = OVS_VXLAN_EXT_MAX},
+    [OVS_TUNNEL_KEY_ATTR_GTPU_FLAGS]    = { .len = 1 },
+    [OVS_TUNNEL_KEY_ATTR_GTPU_MSGTYPE]  = { .len = 1 },
     [OVS_TUNNEL_KEY_ATTR_IPV6_SRC]      = { .len = 16 },
     [OVS_TUNNEL_KEY_ATTR_IPV6_DST]      = { .len = 16 },
 };
@@ -2698,6 +2721,12 @@ odp_tun_key_from_attr__(const struct nlattr *attr, bool is_mask,
         case OVS_TUNNEL_KEY_ATTR_GENEVE_OPTS:
             tun_metadata_from_geneve_nlattr(a, is_mask, tun);
             break;
+        case OVS_TUNNEL_KEY_ATTR_GTPU_FLAGS:
+            tun->gtpu_flags = nl_attr_get_u8(a);
+            break;
+        case OVS_TUNNEL_KEY_ATTR_GTPU_MSGTYPE:
+            tun->gtpu_msgtype = nl_attr_get_u8(a);
+            break;
 
         default:
             /* Allow this to show up as unexpected, if there are unknown
@@ -2766,6 +2795,13 @@ tun_key_to_attr(struct ofpbuf *a, const struct flow_tnl *tun_key,
     }
     if (tun_key->flags & FLOW_TNL_F_OAM) {
         nl_msg_put_flag(a, OVS_TUNNEL_KEY_ATTR_OAM);
+    }
+    if (tun_key->gtpu_flags) {
+        nl_msg_put_u8(a, OVS_TUNNEL_KEY_ATTR_GTPU_FLAGS, tun_key->gtpu_flags);
+    }
+    if (tun_key->gtpu_msgtype) {
+        nl_msg_put_u8(a, OVS_TUNNEL_KEY_ATTR_GTPU_MSGTYPE,
+                      tun_key->gtpu_msgtype);
     }
 
     /* If tnl_type is set to a particular type of output tunnel,
@@ -3486,6 +3522,14 @@ format_odp_tun_attr(const struct nlattr *attr, const struct nlattr *mask_attr,
             ds_put_cstr(ds, "geneve(");
             format_odp_tun_geneve(a, ma, ds, verbose);
             ds_put_cstr(ds, "),");
+            break;
+        case OVS_TUNNEL_KEY_ATTR_GTPU_FLAGS:
+            format_u8x(ds, "gtpu_flags", nl_attr_get_u8(a),
+                       ma ? nl_attr_get(ma) : NULL, verbose);
+            break;
+        case OVS_TUNNEL_KEY_ATTR_GTPU_MSGTYPE:
+            format_u8x(ds, "gtpu_msgtype", nl_attr_get_u8(a),
+                       ma ? nl_attr_get(ma) : NULL, verbose);
             break;
         case OVS_TUNNEL_KEY_ATTR_PAD:
             break;
@@ -5179,6 +5223,10 @@ parse_odp_key_mask_attr(const char *s, const struct simap *port_names,
         SCAN_FIELD_NESTED_FUNC("geneve(", struct geneve_scan, geneve,
                                geneve_to_attr);
         SCAN_FIELD_NESTED_FUNC("flags(", uint16_t, tun_flags, tun_flags_to_attr);
+        SCAN_FIELD_NESTED("gtpu_flags=", uint8_t, u8,
+                          OVS_TUNNEL_KEY_ATTR_GTPU_FLAGS);
+        SCAN_FIELD_NESTED("gtpu_msg_type=", uint8_t, u8,
+                          OVS_TUNNEL_KEY_ATTR_GTPU_MSGTYPE);
     } SCAN_END_NESTED();
 
     SCAN_SINGLE_PORT("in_port(", uint32_t, OVS_KEY_ATTR_IN_PORT);

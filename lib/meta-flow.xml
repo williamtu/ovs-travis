@@ -731,6 +731,12 @@ tcp,tp_src=0x07c0/0xfff0
       Used by Open vSwitch for NSH extensions, in the absence of an official
       ONF-assigned class.  (This OUI is randomly generated.)
     </dd>
+
+    <dt>0x005ad651 (<code>NXOXM_GTPU</code>)</dt>
+    <dd>
+      Used by Open vSwitch for GTP-U extensions, in the absence of an official
+      ONF-assigned class.  (This OUI is randomly generated.)
+    </dd>
   </dl>
 
   <p>
@@ -1896,6 +1902,68 @@ ovs-ofctl add-flow br0 tun_metadata0=1234,actions=controller
 
       <p>
         For non-tunneled packets, the value is 0.
+      </p>
+    </field>
+
+    <h2>GTP-U Fields</h2>
+
+    <p>
+      The GTP-U (v1) header is defined as follows [3GPP TS 29.281].
+    </p>
+
+    <diagram>
+      <header name="GTP-U tunnel flags">
+        <bits name="V" above="3" width="0.15"/>
+        <bits name="PT" above="1" width="0.15"/>
+        <bits name="(*)" above="1" width="0.15"/>
+        <bits name="E" above="1" width="0.15"/>
+        <bits name="S" above="1" width="0.15"/>
+        <bits name="PN" above="1" width="0.15"/>
+      </header>
+      <nospace/>
+      <header>
+         <bits name="Message Type" above="8" width="0.15"/>
+         <bits name="Length" above="16" width="0.15"/>
+         <bits name="TEID" above="32" width="0.15"/>
+         <bits name="..."  above="" width="0.15"/>
+      </header>
+    </diagram>
+
+    <p>
+       where
+    </p>
+    <ul>
+      <li><code>V</code>: version fields, used to determine the version of the
+      GTP-U protocol, which should be set to '1'.</li>
+      <li><code>PT</code>: Packet Type, used as a protocol discriminator
+      between GTP (when PT is '1') and GTP' (when PT is '0').</li>
+      <li><code>E</code>: Extension Header flag, indicating the presence of a
+      meaningful value of the Next Extension Header field.</li>
+      <li><code>S</code>: Sequence number flag, indicating the presence of a
+      meaningful value of the Sequence Number field.</li>
+      <li><code>PN</code>: N-PDU Number flag, indicating the presence of a
+      meaningful value of the N-PDU Number field.</li>
+      <li><code>Message Type</code>: indicating the type of GTP-U message.
+      </li>
+      <li><code>Length</code>: indicating the length in octets of the payload.
+      </li>
+      <li><code>TEID</code>: Tunnel Endpoint Identifier,unambiguously
+      identifying a tunnel endpoint in the receiving GTP-U protocol entity.
+      Open vSwitch makes TEID availabe via <ref field="tun_id"/>.</li>
+    </ul>
+    <field id="MFF_TUN_GTPU_FLAGS" title="GTP-U tunnel flags">
+      <p>
+        For a packet tunneled over GTP-U, this field indicates the presence of
+        optional headers.
+      </p>
+    </field>
+
+    <field id="MFF_TUN_GTPU_MSGTYPE" title="GTP-U tunnel message type">
+      <p>
+        For a packet tunneled over GTP-U, this field indicates whether it's a
+        signalling message used for path management, or a user plane message
+        which carries the original packet. The complete range of message types
+        can be referred to [3GPP TS 29.281].
       </p>
     </field>
 
@@ -4660,6 +4728,14 @@ r r c c c.
       J. Halpern, Ed. and C. Pignataro, Ed.,
       ``Service Function Chaining (SFC) Architecture,''
       <url href="https://tools.ietf.org/html/rfc7665"/>.
+    </dd>
+
+    <dt>3GPP TS 29.281</dt>
+    <dd>
+      3GPP,
+      ``General Packet Radio System (GPRS) Tunnelling Protocol User Plane
+      (GTPv1-U),''
+      <url href="http://www.3gpp.org/ftp/Specs/html-info/29281.htm"/>.
     </dd>
 
     <dt>Srinivasan</dt>

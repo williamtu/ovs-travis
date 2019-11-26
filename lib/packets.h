@@ -1306,6 +1306,23 @@ BUILD_ASSERT_DECL(sizeof(struct vxlanhdr) == 8);
 #define VXLAN_F_GPE  0x4000
 #define VXLAN_HF_GPE 0x04000000
 
+/* GTP-U protocol header */
+struct gtpuhdr {
+    uint8_t flags;
+    uint8_t msgtype;
+    ovs_be16 len;
+    ovs_16aligned_be32 teid;
+};
+
+/* GTP-U UDP port */
+#define GTPU_DST_PORT 2152
+
+/* Default GTP-U flags */
+#define GTPU_FLAGS_DEFAULT 0x30
+
+/* GTP-U message type for normal user plane PDU */
+#define GTPU_MSGTYPE_GPDU 255
+
 /* Input values for PACKET_TYPE macros have to be in host byte order.
  * The _BE postfix indicates result is in network byte order. Otherwise result
  * is in host byte order. */
@@ -1342,6 +1359,8 @@ enum packet_type {
     PT_MPLS = PACKET_TYPE(OFPHTN_ETHERTYPE, ETH_TYPE_MPLS),
     PT_MPLS_MC = PACKET_TYPE(OFPHTN_ETHERTYPE, ETH_TYPE_MPLS_MCAST),
     PT_NSH  = PACKET_TYPE(OFPHTN_ETHERTYPE, ETH_TYPE_NSH),
+    /* GTP-U message. */
+    PT_GTPU_MSG = PACKET_TYPE(OFPHTN_UDP_TCP_PORT, GTPU_DST_PORT),
     PT_UNKNOWN = PACKET_TYPE(0xffff, 0xffff),   /* Unknown packet type. */
 };
 
