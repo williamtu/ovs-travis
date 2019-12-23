@@ -17,7 +17,6 @@ env:
 
 before_install:
   - echo -n | openssl s_client -connect https://scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
-  -  ./.travis/${TRAVIS_OS_NAME}-prepare.sh
 
 addons:
   apt:
@@ -45,8 +44,6 @@ addons:
     build_command: make
     branch_pattern: coverity_scan
 
-before_script: export PATH=$PATH:$HOME/bin
-
 env:
   - OPTS="--disable-ssl"
 
@@ -55,8 +52,6 @@ matrix:
     - os: osx
       compiler: clang
       env: OPTS="--disable-ssl"
-
-script: ./.travis/${TRAVIS_OS_NAME}-build.sh $OPTS
 
 addons:
 notifications:
