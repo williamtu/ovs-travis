@@ -9,6 +9,15 @@ os:
 cache:
   directories:
     - dpdk-dir
+env:
+  global:
+   # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
+   #   via the "travis encrypt" command using the project repo's public key
+   - secure: "eayRgT6iyOU4OmC4CC0MbIkrGhi0IUPGUhOgD/i8d8Xupdaebx6L2UgR+fdLv1jhfPD53JeAZdNtsDFn1LCBkbhn0l0/L80MCHJu/BJDsgxFs5YirlB9NSQvXJ5wuNnhayKccAyHZi6qVR0C5yqjDKTo3eeqQKDDTgyjeG1Gj+L3+cNuzIYNffj9FCMxlrFBqW4haalNF2EwFyedX/LPZkkobAQJatWwar24yN8gmuWSUqmyB34hftssrRyxBgLBCbYKmQpIq0mbVWXGAseU2H1IE35aUjpSuvWZbO4SzDxRZEj5oy2A1x298Fqi30TjJKw9uPr5F8eWeWZ9o0wH/mjUCHO7cuIeq09/DSgbSZg2xrrArdxZc63WFts16Yd9sklqguEE7CjZn4whT8bAFNeGhR0Sbh4GNp4eV7PgxxBZ+0d/qXZDHm7YlMu/p1+dpE4pUQkvduiP+DP0BV7KQxkooAEK/qTFzcZrnDJ+JFV7gGw189SI/kgdKk+ZW5k+5ThG3DV6wCyXiA9PbqD2QCf2OWcC6LEHOZa4pJta2hFd9xERMv73o0cJbfWsEpuefBVTy4S+PzVnOEUruwc1NbHkoQnu+UmRL3mWIh0Vh2qj66D8XogRzc+znUEQc9Ts5PpCzbGYYoZoiRJkZ4COpQdxPkvaMy0e2220+I+QjQc="
+
+before_install:
+  - echo -n | openssl s_client -connect https://scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
+  -  ./.travis/${TRAVIS_OS_NAME}-prepare.sh
 
 addons:
   apt:
@@ -27,24 +36,19 @@ addons:
       - selinux-policy-dev
       - libunbound-dev
       - libunwind-dev
-
-before_install: ./.travis/${TRAVIS_OS_NAME}-prepare.sh
+  coverity_scan:
+    project:
+      name: "williamtu/ovs-travis"
+      description: "<Your project description here>"
+    notification_email: u9012063@gmail.com
+    build_command_prepend: ./boot.sh;./configure
+    build_command: make
+    branch_pattern: coverity_scan
 
 before_script: export PATH=$PATH:$HOME/bin
 
 env:
   - OPTS="--disable-ssl"
-  - TESTSUITE=1 KERNEL=3.16
-  - TESTSUITE=1 OPTS="--enable-shared"
-  - TESTSUITE=1 DPDK=1
-  - TESTSUITE=1 LIBS=-ljemalloc
-  - KERNEL_LIST="5.0  4.20 4.19 4.18 4.17 4.16"
-  - KERNEL_LIST="4.15 4.14 4.9  4.4  3.19 3.16"
-  - AFXDP=1 KERNEL=5.3
-  - M32=1 OPTS="--disable-ssl"
-  - DPDK=1 OPTS="--enable-shared"
-  - DPDK_SHARED=1
-  - DPDK_SHARED=1 OPTS="--enable-shared"
 
 matrix:
   include:
@@ -54,6 +58,7 @@ matrix:
 
 script: ./.travis/${TRAVIS_OS_NAME}-build.sh $OPTS
 
+addons:
 notifications:
   email:
     recipients:
