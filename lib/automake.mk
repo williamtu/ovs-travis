@@ -448,6 +448,8 @@ endif
 
 if HAVE_AF_XDP
 lib_libopenvswitch_la_SOURCES += \
+	lib/meter.c \
+	lib/meter.h \
 	lib/netdev-afxdp-pool.c \
 	lib/netdev-afxdp-pool.h \
 	lib/netdev-afxdp.c \

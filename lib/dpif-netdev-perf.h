@@ -189,17 +189,17 @@ struct pmd_perf_stats {
 
 #ifdef __linux__
 static inline uint64_t
-rdtsc_syscall(struct pmd_perf_stats *s)
+rdtsc_syscall(void)
 {
     struct timespec val;
     uint64_t v;
 
     if (clock_gettime(CLOCK_MONOTONIC_RAW, &val) != 0) {
-       return s->last_tsc;
+       return 0;
     }
 
-    v  = val.tv_sec * UINT64_C(1000000000) + val.tv_nsec;
-    return s->last_tsc = v;
+    v = val.tv_sec * UINT64_C(1000000000) + val.tv_nsec;
+    return v;
 }
 #endif
 
@@ -211,24 +211,30 @@ rdtsc_syscall(struct pmd_perf_stats *s)
  * avoid the overhead of reading the TSC register. */
 
 static inline uint64_t
-cycles_counter_update(struct pmd_perf_stats *s)
+cycles_counter_update__(void)
 {
 #ifdef DPDK_NETDEV
-    return s->last_tsc = rte_get_tsc_cycles();
+    return rte_get_tsc_cycles();
 #elif !defined(_MSC_VER) && defined(__x86_64__)
     uint32_t h, l;
     asm volatile("rdtsc" : "=a" (l), "=d" (h));
 
-    return s->last_tsc = ((uint64_t) h << 32) | l;
+    return ((uint64_t) h << 32) | l;
 #elif !defined(_MSC_VER) && defined(__aarch64__)
-    asm volatile("mrs %0, cntvct_el0" : "=r" (s->last_tsc));
-
-    return s->last_tsc;
+    uint64_t tsc;
+    asm volatile("mrs %0, cntvct_el0" : "=r" (tsc));
+    return tsc;
 #elif defined(__linux__)
-    return rdtsc_syscall(s);
+    return rdtsc_syscall(last_tsc);
 #else
-    return s->last_tsc = 0;
+    return 0;
 #endif
+}
+
+static inline uint64_t
+cycles_counter_update(struct pmd_perf_stats *s)
+{
+    return s->last_tsc = cycles_counter_update__();
 }
 
 static inline uint64_t
@@ -238,6 +244,7 @@ cycles_counter_get(struct pmd_perf_stats *s)
 }
 
 void pmd_perf_estimate_tsc_frequency(void);
+uint64_t pmd_perf_get_tsc_hz(void);
 
 /* A nestable timer for measuring execution time in TSC cycles.
  *
