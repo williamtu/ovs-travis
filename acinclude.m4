@@ -1086,12 +1086,14 @@ dnl OVS_CHECK_LINUX_TPACKET
 dnl
 dnl Configure Linux TPACKET.
 AC_DEFUN([OVS_CHECK_LINUX_TPACKET], [
-  AC_COMPILE_IFELSE([
-    AC_LANG_PROGRAM([#include <linux/if_packet.h>], [
-        struct tpacket3_hdr x =  { 0 };
-    ])],
-    [AC_DEFINE([HAVE_TPACKET_V3], [1],
-    [Define to 1 if struct tpacket3_hdr is available.])])
+  AC_CHECK_HEADER([linux/if_packet.h],
+    [AC_COMPILE_IFELSE([
+      AC_LANG_PROGRAM([#include <linux/if_packet.h>], [
+          struct tpacket3_hdr x =  { 0 };
+      ])],
+      [AC_DEFINE([HAVE_TPACKET_V3], [1],
+      [Define to 1 if struct tpacket3_hdr is available.])])],
+    [])
 ])
 
 dnl Checks for buggy strtok_r.
