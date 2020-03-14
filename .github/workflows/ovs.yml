@@ -1,0 +1,25 @@
+name: OVS CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: configure
+      run: ./boot.sh; ./configure
+    - name: make
+      run: make -j2
+    - name: check-system-userspace
+      run: sudo make check-system-userspace TESTSUITEFLAGS='1-30' RECHECK=yes
+    - name: Upload artifact
+      uses: actions/upload-artifact@v1.0.0
+      if: failure()
+      with:
+        name: system-userspace
+        path: tests/system-userspace-testsuite.dir/
