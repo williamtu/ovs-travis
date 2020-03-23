@@ -164,7 +164,9 @@ fatal_signal_add_hook(void (*hook_cb)(void *aux), void (*cancel_cb)(void *aux),
  * library functions used here must be async-signal-safe.
  */
 static inline void
-send_backtrace_to_monitor(void) {
+send_backtrace_to_monitor(void)
+    OVS_NO_THREAD_SAFETY_ANALYSIS
+{
     /* volatile added to prevent a "clobbered" error on ppc64le with gcc */
     volatile int dep;
     struct unw_backtrace unw_bt[UNW_MAX_DEPTH];
