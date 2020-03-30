@@ -5475,6 +5475,7 @@ ct_zone_timeout_policy_sweep(struct dpif_backer *backer)
     }
 }
 
+//////////////////////
 static void
 ct_set_zone_timeout_policy(const char *datapath_type, uint16_t zone_id,
                            struct simap *timeout_policy)
@@ -5585,7 +5586,7 @@ get_datapath_cap(const char *datapath_type, struct smap *cap)
 bool
 ofproto_dpif_ct_zone_timeout_policy_get_name(
     const struct dpif_backer *backer, uint16_t zone, uint16_t dl_type,
-    uint8_t nw_proto, char **tp_name, bool *unwildcard)
+    uint8_t nw_proto, char **tp_name, bool *unwildcard) //why unwildcard?
 {
     if (!ct_dpif_timeout_policy_support_ipproto(nw_proto)) {
         return false;
@@ -5596,13 +5597,15 @@ ofproto_dpif_ct_zone_timeout_policy_get_name(
         return false;
     }
 
+    // if datapath=netdev, call directly... n
+    // only kernel needs a name of string
     bool is_generic;
     if (ct_dpif_get_timeout_policy_name(backer->dpif,
                                         ct_zone->ct_tp->tp_id, dl_type,
                                         nw_proto, tp_name, &is_generic)) {
         return false;
     }
-
+    VLOG_WARN("%s timeout policy name %s", __func__, *tp_name);
     /* Unwildcard datapath flow if it is not a generic timeout policy. */
     *unwildcard = !is_generic;
     return true;

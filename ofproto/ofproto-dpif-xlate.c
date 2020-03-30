@@ -6073,6 +6073,7 @@ put_ct_timeout(struct ofpbuf *odp_actions, const struct dpif_backer *backer,
     bool unwildcard;
     char *tp_name = NULL;
 
+    // no change here
     if (ofproto_dpif_ct_zone_timeout_policy_get_name(backer, zone_id,
             ntohs(flow->dl_type), flow->nw_proto, &tp_name, &unwildcard)) {
         nl_msg_put_string(odp_actions, OVS_CT_ATTR_TIMEOUT, tp_name);
@@ -6178,7 +6179,7 @@ compose_conntrack_action(struct xlate_ctx *ctx, struct ofpact_conntrack *ofc,
             nl_msg_put_u32(ctx->odp_actions, OVS_CT_ATTR_EVENTMASK,
                            OVS_CT_EVENTMASK_DEFAULT);
         }
-        if (ctx->xbridge->support.ct_timeout) {
+        if (ctx->xbridge->support.ct_timeout) {// netdev bridge enable
             put_ct_timeout(ctx->odp_actions, ctx->xbridge->ofproto->backer,
                            &ctx->xin->flow, ctx->wc, zone);
         }

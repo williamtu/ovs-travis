@@ -118,6 +118,10 @@ struct conn {
     /* Immutable data. */
     bool alg_related; /* True if alg data connection. */
     enum ct_conn_type conn_type;
+
+    // timeout policy for this connection
+    //uint32_t tp[10];
+    uint32_t tpid; // use timeout policy ID to lookup
 };
 
 enum ct_update_res {
@@ -163,6 +167,7 @@ struct conntrack {
     struct cmap conns OVS_GUARDED;
     struct ovs_list exp_lists[N_CT_TM] OVS_GUARDED;
     struct hmap zone_limits OVS_GUARDED;
+    struct hmap timeout_policies;
     uint32_t hash_basis; /* Salt for hashing a connection key. */
     pthread_t clean_thread; /* Periodically cleans up connection tracker. */
     struct latch clean_thread_exit; /* To destroy the 'clean_thread'. */
@@ -216,6 +221,27 @@ conn_init_expiration(struct conntrack *ct, struct conn *conn,
 {
     conn->expiration = now + ct_timeout_val[tm];
     ovs_list_push_back(&ct->exp_lists[tm], &conn->exp_node);
+}
+
+#define TIMEOUT_DEFAULT 100
+static inline void
+conn_update_expiration_with_policy(struct conntrack *ct, struct conn *conn,
+                       enum ct_timeout tm, long long now, uint32_t tp_value)
+    OVS_NO_THREAD_SAFETY_ANALYSIS
+{
+    ovs_mutex_unlock(&conn->lock);
+
+    ovs_mutex_lock(&ct->ct_lock);
+    ovs_mutex_lock(&conn->lock);
+    if (!conn->cleaned) {
+        conn->expiration = now + tp_value * 1000;
+        ovs_list_remove(&conn->exp_node);
+        ovs_list_push_back(&ct->exp_lists[tm], &conn->exp_node);
+    }
+    ovs_mutex_unlock(&conn->lock);
+    ovs_mutex_unlock(&ct->ct_lock);
+
+    ovs_mutex_lock(&conn->lock);
 }
 
 /* The conn entry lock must be held on entry and exit. */

@@ -21,8 +21,11 @@
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
 
+#include "openvswitch/vlog.h"
 #include "conntrack-private.h"
 #include "dp-packet.h"
+
+VLOG_DEFINE_THIS_MODULE(conntrack_icmp);
 
 enum OVS_PACKED_ENUM icmp_state {
     ICMPS_FIRST,
@@ -49,9 +52,25 @@ static enum ct_update_res
 icmp_conn_update(struct conntrack *ct, struct conn *conn_,
                  struct dp_packet *pkt OVS_UNUSED, bool reply, long long now)
 {
+    struct timeout_policy *tp;
     struct conn_icmp *conn = conn_icmp_cast(conn_);
+    //uint32_t tpid = conn_->tpid;
+    //uint32_t icmp_timeout;
+
+    tp = timeout_policy_lookup(ct, conn_->tpid);
+    if (tp) {
+        VLOG_WARN("%s update icmp timeout tpid %d", __func__, tp->id);
+    }
     conn->state = reply ? ICMPS_REPLY : ICMPS_FIRST;
-    conn_update_expiration(ct, &conn->up, icmp_timeouts[conn->state], now);
+    
+    if (tp && tp->id != TIMEOUT_DEFAULT) {
+        conn_update_expiration_with_policy(ct, &conn->up,
+                                           icmp_timeouts[conn->state],
+                                           now, 300); 
+    } else {
+        /* Use default policy. */
+        conn_update_expiration(ct, &conn->up, icmp_timeouts[conn->state], now);
+    }
 
     return CT_UPDATE_VALID;
 }

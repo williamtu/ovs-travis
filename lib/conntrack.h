@@ -93,7 +93,7 @@ int conntrack_execute(struct conntrack *ct, struct dp_packet_batch *pkt_batch,
                       const struct ovs_key_ct_labels *setlabel,
                       ovs_be16 tp_src, ovs_be16 tp_dst, const char *helper,
                       const struct nat_action_info_t *nat_action_info,
-                      long long now);
+                      long long now, uint32_t tpid);
 void conntrack_clear(struct dp_packet *packet);
 
 struct conntrack_dump {
@@ -109,6 +109,15 @@ struct conntrack_zone_limit {
     uint32_t limit;
     uint32_t count;
     uint32_t zone_limit_seq; /* Used to disambiguate zone limit counts. */
+};
+
+struct timeout_policy {
+    struct hmap_node node;
+//    struct ct_dpif_timeout_policy tp;
+    uint32_t    id;
+    uint32_t    present;
+#define DPIF_TP_ATTR_MAX 20
+    uint32_t    attrs[DPIF_TP_ATTR_MAX];
 };
 
 enum {
@@ -139,5 +148,10 @@ struct conntrack_zone_limit zone_limit_get(struct conntrack *ct,
                                            int32_t zone);
 int zone_limit_update(struct conntrack *ct, int32_t zone, uint32_t limit);
 int zone_limit_delete(struct conntrack *ct, uint16_t zone);
+int timeout_policy_update(struct conntrack *ct, struct timeout_policy *tp);
+int timeout_policy_delete(struct conntrack *ct, uint32_t tpid);
+struct timeout_policy *timeout_policy_get(struct conntrack *ct, int32_t tpid);
+struct timeout_policy *timeout_policy_lookup(struct conntrack *ct, int32_t tpid);
+
 
 #endif /* conntrack.h */

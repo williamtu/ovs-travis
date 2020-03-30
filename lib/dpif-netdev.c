@@ -7337,6 +7337,7 @@ dp_execute_cb(void *aux_, struct dp_packet_batch *packets_,
         bool commit = false;
         unsigned int left;
         uint16_t zone = 0;
+        uint32_t tpid = 0;
         const char *helper = NULL;
         const uint32_t *setmark = NULL;
         const struct ovs_key_ct_labels *setlabel = NULL;
@@ -7374,6 +7375,11 @@ dp_execute_cb(void *aux_, struct dp_packet_batch *packets_,
             case OVS_CT_ATTR_TIMEOUT:
                 /* Userspace datapath does not support customized timeout
                  * policy yet. */
+                 // get string and convert to u32
+                if (!str_to_uint(nl_attr_get_string(b), 10, &tpid)) {
+                    VLOG_FATAL("convert failed");
+                }
+                VLOG_WARN("%s get tpid %d", __func__, tpid);
                 break;
             case OVS_CT_ATTR_NAT: {
                 const struct nlattr *b_nest;
@@ -7459,7 +7465,7 @@ dp_execute_cb(void *aux_, struct dp_packet_batch *packets_,
         conntrack_execute(dp->conntrack, packets_, aux->flow->dl_type, force,
                           commit, zone, setmark, setlabel, aux->flow->tp_src,
                           aux->flow->tp_dst, helper, nat_action_info_ref,
-                          pmd->ctx.now / 1000);
+                          pmd->ctx.now / 1000, tpid);
         break;
     }
 
@@ -7607,6 +7613,81 @@ dpif_netdev_ct_get_tcp_seq_chk(struct dpif *dpif, bool *enabled)
 {
     struct dp_netdev *dp = get_dp_netdev(dpif);
     *enabled = conntrack_get_tcp_seq_chk(dp->conntrack);
+    return 0;
+}
+
+static int
+dpif_netdev_ct_set_timeout_policy(struct dpif *dpif, 
+                                  const struct ct_dpif_timeout_policy *dpif_tp)
+{
+    struct timeout_policy tp; 
+    struct dp_netdev *dp;
+    int err = 0;
+
+    VLOG_WARN("%s tp id %d", __func__, dpif_tp->id);
+
+    dp = get_dp_netdev(dpif); 
+
+    tp.id = dpif_tp->id;
+    memcpy(tp.attrs, dpif_tp->attrs, ARRAY_SIZE(tp.attrs));
+
+    err = timeout_policy_update(dp->conntrack, &tp);
+    if (err) {
+        VLOG_WARN("error setting tpid %d", tp.id);
+    }
+
+    return err;
+}
+
+static int
+dpif_netdev_ct_get_timeout_policy(struct dpif *dpif,
+                                  uint32_t tp_id, struct ct_dpif_timeout_policy *tp)
+{
+    struct timeout_policy *_tp;
+    struct dp_netdev *dp;
+    int err = 0;
+
+    VLOG_WARN("%s tp id %d", __func__, tp_id);
+    dp = get_dp_netdev(dpif); 
+    _tp = timeout_policy_get(dp->conntrack, tp_id); 
+    if (!_tp) {
+        VLOG_WARN("error setting tpid %d", tp_id);
+    }
+    tp->present = true;
+    //tp->arrays = _tp->arrays;
+    // FIXME
+    // memcpy 
+    return err;
+}
+
+static int
+dpif_netdev_ct_del_timeout_policy(struct dpif *dpif OVS_UNUSED, uint32_t tp_id OVS_UNUSED)
+{
+    /*
+    struct timeout_policy *tp;
+    struct dp_netdev *dp;
+    int err = 0;
+
+    VLOG_WARN("%s tp id %d", __func__, tp->id);
+*/
+    return 0;
+}
+
+static int
+dpif_netdev_ct_get_timeout_policy_name(struct dpif *dpif OVS_UNUSED,
+                                       uint32_t tp_id,
+                                       uint16_t dl_type OVS_UNUSED,
+                                       uint8_t nw_proto OVS_UNUSED,
+                                       char **tp_name, bool *is_generic)
+{
+    struct ds ds = DS_EMPTY_INITIALIZER; 
+
+    ds_put_format(&ds, "%"PRIu32, tp_id); 
+    *tp_name = ds_steal_cstr(&ds);
+
+    *is_generic = true; // XXX not sure
+
+//    VLOG_WARN("%s tpid %d tp_name %s", __func__, tp_id, *tp_name);
     return 0;
 }
 
@@ -7802,13 +7883,13 @@ const struct dpif_class dpif_netdev_class = {
     dpif_netdev_ct_set_limits,
     dpif_netdev_ct_get_limits,
     dpif_netdev_ct_del_limits,
-    NULL,                       /* ct_set_timeout_policy */
-    NULL,                       /* ct_get_timeout_policy */
-    NULL,                       /* ct_del_timeout_policy */
+    dpif_netdev_ct_set_timeout_policy,                       /* ct_set_timeout_policy */
+    dpif_netdev_ct_get_timeout_policy,                       /* ct_get_timeout_policy */
+    dpif_netdev_ct_del_timeout_policy,                       /* ct_del_timeout_policy */
     NULL,                       /* ct_timeout_policy_dump_start */
     NULL,                       /* ct_timeout_policy_dump_next */
     NULL,                       /* ct_timeout_policy_dump_done */
-    NULL,                       /* ct_get_timeout_policy_name */
+    dpif_netdev_ct_get_timeout_policy_name,  /* ct_get_timeout_policy_name */
     dpif_netdev_ipf_set_enabled,
     dpif_netdev_ipf_set_min_frag,
     dpif_netdev_ipf_set_max_nfrags,

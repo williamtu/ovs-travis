@@ -143,6 +143,12 @@ detect_ftp_ctl_type(const struct conn_lookup_ctx *ctx,
 static void
 expectation_clean(struct conntrack *ct, const struct conn_key *master_key);
 
+// timeout policy
+void timeout_policy_init(struct conntrack *ct);
+struct timeout_policy * timeout_policy_get(struct conntrack *ct, int32_t tpid);
+static int timeout_policy_create(struct conntrack *ct, struct timeout_policy *_tp);
+static void timeout_policy_clean(struct conntrack *ct, struct timeout_policy *tp);
+
 static struct ct_l4_proto *l4_protos[] = {
     [IPPROTO_TCP] = &ct_proto_tcp,
     [IPPROTO_UDP] = &ct_proto_other,
@@ -312,6 +318,7 @@ conntrack_init(void)
     }
     hmap_init(&ct->zone_limits);
     ct->zone_limit_seq = 0;
+    timeout_policy_init(ct); /* Init timeout policy. */
     ovs_mutex_unlock(&ct->ct_lock);
 
     ct->hash_basis = random_uint32();
@@ -365,6 +372,125 @@ zone_limit_get(struct conntrack *ct, int32_t zone)
     }
     ovs_mutex_unlock(&ct->ct_lock);
     return czl;
+}
+
+struct timeout_policy *
+timeout_policy_get(struct conntrack *ct, int32_t tpid)
+{
+    struct timeout_policy *tp;
+
+    ovs_mutex_lock(&ct->ct_lock);
+    tp = timeout_policy_lookup(ct, tpid);
+    if (!tp) {
+        VLOG_WARN("no timeout policy, return default!");
+        // FIXME
+    }
+
+    ovs_mutex_unlock(&ct->ct_lock);
+    return tp;
+}
+
+struct timeout_policy *
+timeout_policy_lookup(struct conntrack *ct, int32_t tpid)
+{
+    struct timeout_policy *tp;
+    uint32_t hash;
+
+    hash = zone_key_hash(tpid, ct->hash_basis);
+    HMAP_FOR_EACH_IN_BUCKET (tp, node, hash, &ct->timeout_policies) {
+        if (tp->id == tpid) {
+            VLOG_WARN("tpid %d found", tpid);
+            return tp;
+        }
+    }
+    VLOG_WARN("tpid %d not found", tpid);
+    return NULL;
+}
+
+static bool
+is_valid_tpid(uint32_t tpid OVS_UNUSED)
+{
+    return true;
+}
+
+static int
+timeout_policy_create(struct conntrack *ct,
+                      struct timeout_policy *_tp)
+{
+    uint32_t tpid = _tp->id;
+    uint32_t hash;
+
+    VLOG_WARN("%s tpid %d", __func__, tpid);
+    if (is_valid_tpid(tpid)) {
+        struct timeout_policy *tp;
+
+        VLOG_WARN("ok");
+        tp = xzalloc(sizeof *tp);
+        tp->id = tpid;
+        tp->present = true; 
+        memcpy(tp->attrs, _tp->attrs, ARRAY_SIZE(tp->attrs));
+
+        hash = zone_key_hash(tpid, ct->hash_basis);
+        hmap_insert(&ct->timeout_policies, &tp->node, hash);
+
+        return 0; 
+    } else {
+        VLOG_WARN("fail");
+        return EINVAL;
+    }
+}
+
+int
+timeout_policy_update(struct conntrack *ct, struct timeout_policy *_tp)
+{
+    int err = 0;
+    uint32_t tpid = _tp->id;
+
+    ovs_mutex_lock(&ct->ct_lock);
+    struct timeout_policy *tp = timeout_policy_lookup(ct, tpid);
+    if (tp) {
+        VLOG_INFO("Changed timeout policy of tpid %d", tpid);
+        memcpy(tp->attrs, _tp->attrs, ARRAY_SIZE(tp->attrs));
+    } else {
+        err = timeout_policy_create(ct, _tp);
+        if (err) {
+            VLOG_WARN("Request to create timeout policy failed");
+        } else {
+            VLOG_INFO("Created timeout policy tpid %d", tpid);
+        }
+    }
+    ovs_mutex_unlock(&ct->ct_lock);
+    return err;
+}
+
+static void
+timeout_policy_clean(struct conntrack *ct, struct timeout_policy *tp)
+//    OVS_REQUIRES(ct->ct_lock)
+{
+    hmap_remove(&ct->zone_limits, &tp->node);
+    free(tp);
+}
+
+int
+timeout_policy_delete(struct conntrack *ct, uint32_t tpid)
+{
+    ovs_mutex_lock(&ct->ct_lock);
+    struct timeout_policy *tp = timeout_policy_lookup(ct, tpid);
+    if (tp) {
+        VLOG_INFO("Deleted timeout policy for id %d", tpid);
+        timeout_policy_clean(ct, tp);
+    } else {
+        VLOG_INFO("Attempted delete of non-existent timeout policy: zone %d",
+                  tpid);
+    }
+    ovs_mutex_unlock(&ct->ct_lock);
+    return 0;
+}
+
+void
+timeout_policy_init(struct conntrack *ct)
+{
+    hmap_init(&ct->timeout_policies);
 }
 
 static int
@@ -501,6 +627,12 @@ conntrack_destroy(struct conntrack *ct)
         free(zl);
     }
     hmap_destroy(&ct->zone_limits);
+
+    struct timeout_policy *tp;
+    HMAP_FOR_EACH_POP (tp, node, &ct->timeout_policies) {
+        free(tp);
+    }
+    hmap_destroy(&ct->timeout_policies);
 
     ovs_mutex_unlock(&ct->ct_lock);
     ovs_mutex_destroy(&ct->ct_lock);
@@ -1275,7 +1407,7 @@ process_one(struct conntrack *ct, struct dp_packet *pkt,
             bool force, bool commit, long long now, const uint32_t *setmark,
             const struct ovs_key_ct_labels *setlabel,
             const struct nat_action_info_t *nat_action_info,
-            ovs_be16 tp_src, ovs_be16 tp_dst, const char *helper)
+            ovs_be16 tp_src, ovs_be16 tp_dst, const char *helper, uint32_t tpid)
 {
     /* Reset ct_state whenever entering a new zone. */
     if (pkt->md.ct_state && pkt->md.ct_zone != zone) {
@@ -1285,6 +1417,7 @@ process_one(struct conntrack *ct, struct dp_packet *pkt,
     bool create_new_conn = false;
     conn_key_lookup(ct, &ctx->key, ctx->hash, now, &ctx->conn, &ctx->reply);
     struct conn *conn = ctx->conn;
+
 
     /* Delete found entry if in wrong direction. 'force' implies commit. */
     if (OVS_UNLIKELY(force && ctx->reply && conn)) {
@@ -1323,7 +1456,8 @@ process_one(struct conntrack *ct, struct dp_packet *pkt,
                                               nat_action_info,
                                               ct_alg_ctl, now,
                                               &create_new_conn))) {
-            create_new_conn = conn_update_state(ct, pkt, ctx, conn, now);
+            conn->tpid = tpid;
+            create_new_conn = conn_update_state(ct, pkt, ctx, conn, now); //pass tp->id? or add to struct conn
         }
         if (nat_action_info && !create_new_conn) {
             handle_nat(pkt, conn, zone, ctx->reply, ctx->icmp_related);
@@ -1395,13 +1529,15 @@ conntrack_execute(struct conntrack *ct, struct dp_packet_batch *pkt_batch,
                   const struct ovs_key_ct_labels *setlabel,
                   ovs_be16 tp_src, ovs_be16 tp_dst, const char *helper,
                   const struct nat_action_info_t *nat_action_info,
-                  long long now)
+                  long long now, uint32_t tpid) // add tpid
 {
     ipf_preprocess_conntrack(ct->ipf, pkt_batch, now, dl_type, zone,
                              ct->hash_basis);
 
     struct dp_packet *packet;
     struct conn_lookup_ctx ctx;
+
+    VLOG_WARN("%s tpid %d", __func__, tpid);
 
     DP_PACKET_BATCH_FOR_EACH (i, packet, pkt_batch) {
         struct conn *conn = packet->md.conn;
@@ -1417,7 +1553,7 @@ conntrack_execute(struct conntrack *ct, struct dp_packet_batch *pkt_batch,
             write_ct_md(packet, zone, NULL, NULL, NULL);
         } else {
             process_one(ct, packet, &ctx, zone, force, commit, now, setmark,
-                        setlabel, nat_action_info, tp_src, tp_dst, helper);
+                        setlabel, nat_action_info, tp_src, tp_dst, helper, tpid);
         }
     }
 
@@ -2319,7 +2455,18 @@ static enum ct_update_res
 conn_update(struct conntrack *ct, struct conn *conn, struct dp_packet *pkt,
             struct conn_lookup_ctx *ctx, long long now)
 {
+
+    struct timeout_policy *tp;
     ovs_mutex_lock(&conn->lock);
+
+    // lookup hmap here using tpid:
+
+    tp = timeout_policy_lookup(ct, conn->tpid);
+    if (tp) {
+        VLOG_WARN("%s tpid %d", __func__, tp->id);
+    }
+    // ex: icmp_conn_update
+
     enum ct_update_res update_res =
         l4_protos[conn->key.nw_proto]->conn_update(ct, conn, pkt, ctx->reply,
                                                    now);
