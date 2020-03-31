@@ -3,7 +3,6 @@
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at:
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -7616,6 +7615,27 @@ dpif_netdev_ct_get_tcp_seq_chk(struct dpif *dpif, bool *enabled)
     return 0;
 }
 
+static void
+dpif_netdev_ct_copy_timeout_policy(struct timeout_policy *tp,
+                                   const struct ct_dpif_timeout_policy *_tp)
+{
+    struct timeout_policy_value *val;
+
+    val = &tp->v;
+    val->tcp_first_packet = _tp->attrs[CT_DPIF_TP_ATTR_TCP_SYN_SENT];
+    val->tcp_opening = _tp->attrs[CT_DPIF_TP_ATTR_TCP_SYN_RECV];
+    val->tcp_established = _tp->attrs[CT_DPIF_TP_ATTR_TCP_ESTABLISHED];
+    val->tcp_closing = _tp->attrs[CT_DPIF_TP_ATTR_TCP_FIN_WAIT];
+    val->other_first = _tp->attrs[CT_DPIF_TP_ATTR_UDP_FIRST];
+    val->other_first = _tp->attrs[CT_DPIF_TP_ATTR_UDP_SINGLE];
+    val->other_bidir = _tp->attrs[CT_DPIF_TP_ATTR_UDP_MULTIPLE];
+    val->icmp_first = _tp->attrs[CT_DPIF_TP_ATTR_ICMP_FIRST];
+    val->icmp_reply = _tp->attrs[CT_DPIF_TP_ATTR_ICMP_REPLY];
+
+    tp->id = _tp->id;
+    tp->present = _tp->present;
+}
+
 static int
 dpif_netdev_ct_set_timeout_policy(struct dpif *dpif, 
                                   const struct ct_dpif_timeout_policy *dpif_tp)
@@ -7625,12 +7645,8 @@ dpif_netdev_ct_set_timeout_policy(struct dpif *dpif,
     int err = 0;
 
     VLOG_WARN("%s tp id %d", __func__, dpif_tp->id);
-
     dp = get_dp_netdev(dpif); 
-
-    tp.id = dpif_tp->id;
-    memcpy(tp.attrs, dpif_tp->attrs, ARRAY_SIZE(tp.attrs));
-
+    dpif_netdev_ct_copy_timeout_policy(&tp, dpif_tp);
     err = timeout_policy_update(dp->conntrack, &tp);
     if (err) {
         VLOG_WARN("error setting tpid %d", tp.id);

@@ -48,25 +48,54 @@ conn_icmp_cast(const struct conn *conn)
     return CONTAINER_OF(conn, struct conn_icmp, up);
 }
 
+static bool
+tp_has_icmp_reply(struct timeout_policy *tp, uint32_t *v)
+{
+    if (!tp) {
+        return false;
+    }
+    if (tp->present & (1 << CT_DPIF_TP_ATTR_ICMP_REPLY)) {
+        *v = tp->v.icmp_reply;
+        VLOG_WARN("set icmp reply to %d", *v);
+        return true;
+    }
+    return false;
+}
+
+static bool
+tp_has_icmp_first(struct timeout_policy *tp, uint32_t *v)
+{
+    if (!tp) {
+        return false;
+    }
+    if (tp->present & (1 << CT_DPIF_TP_ATTR_ICMP_FIRST)) {
+        *v = tp->v.icmp_first;
+        VLOG_WARN("set icmp first to %d", *v);
+        return true;
+    }
+    return false;
+}
+
 static enum ct_update_res
 icmp_conn_update(struct conntrack *ct, struct conn *conn_,
                  struct dp_packet *pkt OVS_UNUSED, bool reply, long long now)
 {
+    uint32_t val;
     struct timeout_policy *tp;
     struct conn_icmp *conn = conn_icmp_cast(conn_);
-    //uint32_t tpid = conn_->tpid;
-    //uint32_t icmp_timeout;
 
-    tp = timeout_policy_lookup(ct, conn_->tpid);
-    if (tp) {
-        VLOG_WARN("%s update icmp timeout tpid %d", __func__, tp->id);
-    }
     conn->state = reply ? ICMPS_REPLY : ICMPS_FIRST;
     
-    if (tp && tp->id != TIMEOUT_DEFAULT) {
+    tp = timeout_policy_lookup(ct, conn_->tpid);
+
+    if (reply && tp_has_icmp_reply(tp, &val)) {
         conn_update_expiration_with_policy(ct, &conn->up,
                                            icmp_timeouts[conn->state],
-                                           now, 300); 
+                                           now, val);
+    } else if (!reply && tp_has_icmp_first(tp, &val)) {
+        conn_update_expiration_with_policy(ct, &conn->up,
+                                           icmp_timeouts[conn->state],
+                                           now, val);
     } else {
         /* Use default policy. */
         conn_update_expiration(ct, &conn->up, icmp_timeouts[conn->state], now);

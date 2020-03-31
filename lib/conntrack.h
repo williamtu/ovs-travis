@@ -111,13 +111,23 @@ struct conntrack_zone_limit {
     uint32_t zone_limit_seq; /* Used to disambiguate zone limit counts. */
 };
 
+struct timeout_policy_value {
+    uint32_t tcp_first_packet;
+    uint32_t tcp_opening;
+    uint32_t tcp_established;
+    uint32_t tcp_closing;
+    uint32_t other_first;
+    uint32_t other_multiple;
+    uint32_t other_bidir;
+    uint32_t icmp_first;
+    uint32_t icmp_reply;
+};
+
 struct timeout_policy {
     struct hmap_node node;
-//    struct ct_dpif_timeout_policy tp;
-    uint32_t    id;
-    uint32_t    present;
-#define DPIF_TP_ATTR_MAX 20
-    uint32_t    attrs[DPIF_TP_ATTR_MAX];
+    uint32_t id;
+    uint32_t present;
+    struct timeout_policy_value v; 
 };
 
 enum {

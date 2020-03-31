@@ -424,18 +424,16 @@ timeout_policy_create(struct conntrack *ct,
     if (is_valid_tpid(tpid)) {
         struct timeout_policy *tp;
 
-        VLOG_WARN("ok");
         tp = xzalloc(sizeof *tp);
         tp->id = tpid;
-        tp->present = true; 
-        memcpy(tp->attrs, _tp->attrs, ARRAY_SIZE(tp->attrs));
+        tp->present = _tp->present;
+        memcpy(&tp->v, &_tp->v, sizeof tp->v);
 
         hash = zone_key_hash(tpid, ct->hash_basis);
         hmap_insert(&ct->timeout_policies, &tp->node, hash);
 
         return 0; 
     } else {
-        VLOG_WARN("fail");
         return EINVAL;
     }
 }
@@ -450,7 +448,9 @@ timeout_policy_update(struct conntrack *ct, struct timeout_policy *_tp)
     struct timeout_policy *tp = timeout_policy_lookup(ct, tpid);
     if (tp) {
         VLOG_INFO("Changed timeout policy of tpid %d", tpid);
-        memcpy(tp->attrs, _tp->attrs, ARRAY_SIZE(tp->attrs));
+
+        memcpy(&tp->v, &_tp->v, sizeof tp->v);
+        tp->present = _tp->present;
     } else {
         err = timeout_policy_create(ct, _tp);
         if (err) {
@@ -2455,17 +2455,7 @@ static enum ct_update_res
 conn_update(struct conntrack *ct, struct conn *conn, struct dp_packet *pkt,
             struct conn_lookup_ctx *ctx, long long now)
 {
-
-    struct timeout_policy *tp;
     ovs_mutex_lock(&conn->lock);
-
-    // lookup hmap here using tpid:
-
-    tp = timeout_policy_lookup(ct, conn->tpid);
-    if (tp) {
-        VLOG_WARN("%s tpid %d", __func__, tp->id);
-    }
-    // ex: icmp_conn_update
 
     enum ct_update_res update_res =
         l4_protos[conn->key.nw_proto]->conn_update(ct, conn, pkt, ctx->reply,
