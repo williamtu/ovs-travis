@@ -7902,9 +7902,9 @@ const struct dpif_class dpif_netdev_class = {
     dpif_netdev_ct_set_limits,
     dpif_netdev_ct_get_limits,
     dpif_netdev_ct_del_limits,
-    dpif_netdev_ct_set_timeout_policy,                       /* ct_set_timeout_policy */
-    dpif_netdev_ct_get_timeout_policy,                       /* ct_get_timeout_policy */
-    dpif_netdev_ct_del_timeout_policy,                       /* ct_del_timeout_policy */
+    dpif_netdev_ct_set_timeout_policy,
+    dpif_netdev_ct_get_timeout_policy,
+    dpif_netdev_ct_del_timeout_policy,
     NULL,                       /* ct_timeout_policy_dump_start */
     NULL,                       /* ct_timeout_policy_dump_next */
     NULL,                       /* ct_timeout_policy_dump_done */

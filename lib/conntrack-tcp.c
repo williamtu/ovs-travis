@@ -217,7 +217,34 @@ tp_has_tcp_fin_wait(struct timeout_policy *tp, uint32_t *v) /* tcp closing */
         return true;
     }
     return false;
+}
 
+static bool
+tp_has_tcp_time_wait(struct timeout_policy *tp, uint32_t *v) /* tcp fin wait */
+{
+    if (!tp) {
+        return false;
+    }
+    if (tp->p.present & (1 << CT_DPIF_TP_ATTR_TCP_TIME_WAIT)) {
+        *v = tp->p.attrs[CT_DPIF_TP_ATTR_TCP_TIME_WAIT];
+        VLOG_WARN("set tcp fin wait");
+        return true;
+    }
+    return false;
+}
+
+static bool
+tp_has_tcp_closed(struct timeout_policy *tp, uint32_t *v) /* tcp close */
+{
+    if (!tp) {
+        return false;
+    }
+    if (tp->p.present & (1 << CT_DPIF_TP_ATTR_TCP_CLOSE)) {
+        *v = tp->p.attrs[CT_DPIF_TP_ATTR_TCP_CLOSE];
+        VLOG_WARN("set tcp close");
+        return true;
+    }
+    return false;
 }
 
 static inline void
@@ -251,10 +278,14 @@ tcp_conn_update_expiration(struct conntrack *ct, struct conn *conn,
         }
         break;
     case CT_TM_TCP_FIN_WAIT:
-        // TODO
+        if (tp_has_tcp_time_wait(tp, &val)) {
+            conn_update_expiration_with_policy(ct, conn, tm, now, val);
+        }
         break;
     case CT_TM_TCP_CLOSED:
-        // TODO
+        if (tp_has_tcp_closed(tp, &val)) {
+            conn_update_expiration_with_policy(ct, conn, tm, now, val);
+        }
         break;
     case CT_TM_OTHER_FIRST:
     case CT_TM_OTHER_MULTIPLE:
