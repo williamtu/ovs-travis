@@ -54,8 +54,8 @@ tp_has_icmp_reply(struct timeout_policy *tp, uint32_t *v)
     if (!tp) {
         return false;
     }
-    if (tp->present & (1 << CT_DPIF_TP_ATTR_ICMP_REPLY)) {
-        *v = tp->v.icmp_reply;
+    if (tp->p.present & (1 << CT_DPIF_TP_ATTR_ICMP_REPLY)) {
+        *v = tp->p.attrs[CT_DPIF_TP_ATTR_ICMP_REPLY];
         VLOG_WARN("set icmp reply to %d", *v);
         return true;
     }
@@ -68,8 +68,8 @@ tp_has_icmp_first(struct timeout_policy *tp, uint32_t *v)
     if (!tp) {
         return false;
     }
-    if (tp->present & (1 << CT_DPIF_TP_ATTR_ICMP_FIRST)) {
-        *v = tp->v.icmp_first;
+    if (tp->p.present & (1 << CT_DPIF_TP_ATTR_ICMP_FIRST)) {
+        *v = tp->p.attrs[CT_DPIF_TP_ATTR_ICMP_FIRST];
         VLOG_WARN("set icmp first to %d", *v);
         return true;
     }

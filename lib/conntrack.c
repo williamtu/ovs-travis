@@ -398,7 +398,7 @@ timeout_policy_lookup(struct conntrack *ct, int32_t tpid)
 
     hash = zone_key_hash(tpid, ct->hash_basis);
     HMAP_FOR_EACH_IN_BUCKET (tp, node, hash, &ct->timeout_policies) {
-        if (tp->id == tpid) {
+        if (tp->p.id == tpid) {
             VLOG_WARN("tpid %d found", tpid);
             return tp;
         }
@@ -415,9 +415,9 @@ is_valid_tpid(uint32_t tpid OVS_UNUSED)
 
 static int
 timeout_policy_create(struct conntrack *ct,
-                      struct timeout_policy *_tp)
+                      struct timeout_policy *new_tp)
 {
-    uint32_t tpid = _tp->id;
+    uint32_t tpid = new_tp->p.id;
     uint32_t hash;
 
     VLOG_WARN("%s tpid %d", __func__, tpid);
@@ -425,9 +425,7 @@ timeout_policy_create(struct conntrack *ct,
         struct timeout_policy *tp;
 
         tp = xzalloc(sizeof *tp);
-        tp->id = tpid;
-        tp->present = _tp->present;
-        memcpy(&tp->v, &_tp->v, sizeof tp->v);
+        memcpy(&tp->p, &new_tp->p, sizeof tp->p);
 
         hash = zone_key_hash(tpid, ct->hash_basis);
         hmap_insert(&ct->timeout_policies, &tp->node, hash);
@@ -438,21 +436,38 @@ timeout_policy_create(struct conntrack *ct,
     }
 }
 
+static void
+update_existing_tp(struct timeout_policy *tp_dst,
+                   struct timeout_policy *tp_src)
+{
+    struct ct_dpif_timeout_policy *dst, *src;
+    int i;
+
+    dst = &tp_dst->p;
+    src = &tp_src->p;
+
+    /* Set the value to dst if present bit in src is set. */
+    for (i = 0; i < ARRAY_SIZE(dst->attrs); i++) {
+        if (src->present & (1 << i)) {
+            dst->attrs[i] = src->attrs[i];
+            dst->present |= (1 << i);
+        }
+    }
+}
+
 int
-timeout_policy_update(struct conntrack *ct, struct timeout_policy *_tp)
+timeout_policy_update(struct conntrack *ct, struct timeout_policy *new_tp)
 {
     int err = 0;
-    uint32_t tpid = _tp->id;
+    uint32_t tpid = new_tp->p.id;
 
     ovs_mutex_lock(&ct->ct_lock);
     struct timeout_policy *tp = timeout_policy_lookup(ct, tpid);
     if (tp) {
-        VLOG_INFO("Changed timeout policy of tpid %d", tpid);
-
-        memcpy(&tp->v, &_tp->v, sizeof tp->v);
-        tp->present = _tp->present;
+        VLOG_INFO("Changed timeout policy of existing tpid %d", tpid);
+        update_existing_tp(tp, new_tp);
     } else {
-        err = timeout_policy_create(ct, _tp);
+        err = timeout_policy_create(ct, new_tp);
         if (err) {
             VLOG_WARN("Request to create timeout policy failed");
         } else {

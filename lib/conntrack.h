@@ -31,6 +31,9 @@
 #include "packets.h"
 #include "hindex.h"
 
+
+#include "ct-dpif.h"
+
 /* Userspace connection tracker
  * ============================
  *
@@ -125,9 +128,11 @@ struct timeout_policy_value {
 
 struct timeout_policy {
     struct hmap_node node;
-    uint32_t id;
-    uint32_t present;
-    struct timeout_policy_value v; 
+    struct ct_dpif_timeout_policy p;
+
+    //uint32_t id;
+    //uint32_t present;
+    //struct timeout_policy_value v;
 };
 
 enum {

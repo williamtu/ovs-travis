@@ -44,6 +44,10 @@
 #include "dp-packet.h"
 #include "util.h"
 
+#include "openvswitch/vlog.h"
+
+VLOG_DEFINE_THIS_MODULE(conntrack_tcp);
+
 COVERAGE_DEFINE(conntrack_tcp_seq_chk_bypass);
 COVERAGE_DEFINE(conntrack_tcp_seq_chk_failed);
 COVERAGE_DEFINE(conntrack_invalid_tcp_flags);
@@ -159,6 +163,114 @@ tcp_bypass_seq_chk(struct conntrack *ct)
     return false;
 }
 
+static bool
+tp_has_tcp_syn_sent(struct timeout_policy *tp, uint32_t *v) /* first packet */
+{
+    if (!tp) {
+        return false;
+    }
+    if (tp->p.present & (1 << CT_DPIF_TP_ATTR_TCP_SYN_SENT)) {
+        *v = tp->p.attrs[CT_DPIF_TP_ATTR_TCP_SYN_SENT];
+        VLOG_WARN("set tcp first packet");
+        return true;
+    }
+    return false;
+}
+
+static bool
+tp_has_tcp_syn_recv(struct timeout_policy *tp, uint32_t *v) /* tcp opening */
+{
+    if (!tp) {
+        return false;
+    }
+    if (tp->p.present & (1 << CT_DPIF_TP_ATTR_TCP_SYN_RECV)) {
+        *v = tp->p.attrs[CT_DPIF_TP_ATTR_TCP_SYN_RECV];
+        VLOG_WARN("set tcp opening");
+        return true;
+    }
+    return false;
+}
+
+static bool
+tp_has_tcp_established(struct timeout_policy *tp, uint32_t *v) /* tcp established */
+{
+    if (!tp) {
+        return false;
+    }
+    if (tp->p.present & (1 << CT_DPIF_TP_ATTR_TCP_ESTABLISHED)) {
+        *v = tp->p.attrs[CT_DPIF_TP_ATTR_TCP_ESTABLISHED];
+        VLOG_WARN("set tcp est");
+        return true;
+    }
+    return false;
+}
+
+static bool
+tp_has_tcp_fin_wait(struct timeout_policy *tp, uint32_t *v) /* tcp closing */
+{
+    if (!tp) {
+        return false;
+    }
+    if (tp->p.present & (1 << CT_DPIF_TP_ATTR_TCP_FIN_WAIT)) {
+        *v = tp->p.attrs[CT_DPIF_TP_ATTR_TCP_FIN_WAIT];
+        VLOG_WARN("set tcp closing");
+        return true;
+    }
+    return false;
+
+}
+
+static inline void
+tcp_conn_update_expiration(struct conntrack *ct, struct conn *conn,
+                           enum ct_timeout tm, long long now)
+{
+    struct timeout_policy *tp;
+    uint32_t val;
+
+    tp = timeout_policy_lookup(ct, conn->tpid);
+
+    switch (tm) {
+    case CT_TM_TCP_FIRST_PACKET:
+        if (tp_has_tcp_syn_sent(tp, &val)) {
+            conn_update_expiration_with_policy(ct, conn, tm, now, val);
+        }
+        break;
+    case CT_TM_TCP_OPENING: 
+        if (tp_has_tcp_syn_recv(tp, &val)) {
+            conn_update_expiration_with_policy(ct, conn, tm, now, val);
+        }
+        break;
+    case CT_TM_TCP_ESTABLISHED:
+        if (tp_has_tcp_established(tp, &val)) {
+            conn_update_expiration_with_policy(ct, conn, tm, now, val);
+        }
+        break;
+    case CT_TM_TCP_CLOSING:
+        if (tp_has_tcp_fin_wait(tp, &val)) {
+            conn_update_expiration_with_policy(ct, conn, tm, now, val);
+        }
+        break;
+    case CT_TM_TCP_FIN_WAIT:
+        // TODO
+        break;
+    case CT_TM_TCP_CLOSED:
+        // TODO
+        break;
+    case CT_TM_OTHER_FIRST:
+    case CT_TM_OTHER_MULTIPLE:
+    case CT_TM_OTHER_BIDIR:
+    case CT_TM_ICMP_FIRST:
+    case CT_TM_ICMP_REPLY:
+    case N_CT_TM:
+        VLOG_WARN("%s case not handled", __func__);
+        break;
+    default:
+        /* Update Default Policy */
+        conn_update_expiration(ct, conn, tm, now);
+        break;
+    }
+}
+
 static enum ct_update_res
 tcp_conn_update(struct conntrack *ct, struct conn *conn_,
                 struct dp_packet *pkt, bool reply, long long now)
@@ -188,7 +300,7 @@ tcp_conn_update(struct conntrack *ct, struct conn *conn_,
             return CT_UPDATE_NEW;
         } else if (src->state <= CT_DPIF_TCPS_SYN_SENT) {
             src->state = CT_DPIF_TCPS_SYN_SENT;
-            conn_update_expiration(ct, &conn->up, CT_TM_TCP_FIRST_PACKET, now);
+            tcp_conn_update_expiration(ct, &conn->up, CT_TM_TCP_FIRST_PACKET, now);
             return CT_UPDATE_VALID_NEW;
         }
     }
@@ -339,18 +451,18 @@ tcp_conn_update(struct conntrack *ct, struct conn *conn_,
 
         if (src->state >= CT_DPIF_TCPS_FIN_WAIT_2
             && dst->state >= CT_DPIF_TCPS_FIN_WAIT_2) {
-            conn_update_expiration(ct, &conn->up, CT_TM_TCP_CLOSED, now);
+            tcp_conn_update_expiration(ct, &conn->up, CT_TM_TCP_CLOSED, now);
         } else if (src->state >= CT_DPIF_TCPS_CLOSING
                    && dst->state >= CT_DPIF_TCPS_CLOSING) {
-            conn_update_expiration(ct, &conn->up, CT_TM_TCP_FIN_WAIT, now);
+            tcp_conn_update_expiration(ct, &conn->up, CT_TM_TCP_FIN_WAIT, now);
         } else if (src->state < CT_DPIF_TCPS_ESTABLISHED
                    || dst->state < CT_DPIF_TCPS_ESTABLISHED) {
-            conn_update_expiration(ct, &conn->up, CT_TM_TCP_OPENING, now);
+            tcp_conn_update_expiration(ct, &conn->up, CT_TM_TCP_OPENING, now);
         } else if (src->state >= CT_DPIF_TCPS_CLOSING
                    || dst->state >= CT_DPIF_TCPS_CLOSING) {
-            conn_update_expiration(ct, &conn->up, CT_TM_TCP_CLOSING, now);
+            tcp_conn_update_expiration(ct, &conn->up, CT_TM_TCP_CLOSING, now);
         } else {
-            conn_update_expiration(ct, &conn->up, CT_TM_TCP_ESTABLISHED, now);
+            tcp_conn_update_expiration(ct, &conn->up, CT_TM_TCP_ESTABLISHED, now);
         }
     } else if ((dst->state < CT_DPIF_TCPS_SYN_SENT
                 || dst->state >= CT_DPIF_TCPS_FIN_WAIT_2

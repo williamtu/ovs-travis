@@ -7615,6 +7615,7 @@ dpif_netdev_ct_get_tcp_seq_chk(struct dpif *dpif, bool *enabled)
     return 0;
 }
 
+#if 0
 static void
 dpif_netdev_ct_copy_timeout_policy(struct timeout_policy *tp,
                                    const struct ct_dpif_timeout_policy *_tp)
@@ -7635,6 +7636,7 @@ dpif_netdev_ct_copy_timeout_policy(struct timeout_policy *tp,
     tp->id = _tp->id;
     tp->present = _tp->present;
 }
+#endif
 
 static int
 dpif_netdev_ct_set_timeout_policy(struct dpif *dpif, 
@@ -7646,10 +7648,11 @@ dpif_netdev_ct_set_timeout_policy(struct dpif *dpif,
 
     VLOG_WARN("%s tp id %d", __func__, dpif_tp->id);
     dp = get_dp_netdev(dpif); 
-    dpif_netdev_ct_copy_timeout_policy(&tp, dpif_tp);
+    //dpif_netdev_ct_copy_timeout_policy(&tp, dpif_tp);
+    memcpy(&tp.p, dpif_tp, sizeof tp.p);
     err = timeout_policy_update(dp->conntrack, &tp);
     if (err) {
-        VLOG_WARN("error setting tpid %d", tp.id);
+        VLOG_WARN("error setting tpid %d", dpif_tp->id);
     }
 
     return err;
