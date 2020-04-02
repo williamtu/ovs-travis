@@ -89,7 +89,7 @@ tp_has_udp_multiple(struct timeout_policy *tp, uint32_t *v) /* other bidir */
 
 static inline void
 other_conn_update_expiration(struct conntrack *ct, struct conn *conn,
-                       enum ct_timeout tm, long long now)
+                             enum ct_timeout tm, long long now)
 {
     struct timeout_policy *tp;
     uint32_t val;

@@ -76,30 +76,50 @@ tp_has_icmp_first(struct timeout_policy *tp, uint32_t *v)
     return false;
 }
 
+static inline void
+icmp_conn_update_expiration(struct conntrack *ct, struct conn *conn,
+                            enum ct_timeout tm, long long now)
+{
+    struct timeout_policy *tp;
+    uint32_t val;
+
+    tp = timeout_policy_lookup(ct, conn->tpid);
+    switch (tm) {
+    case CT_TM_ICMP_FIRST:
+        if (tp_has_icmp_first(tp, &val)) {
+            conn_update_expiration_with_policy(ct, conn, tm, now, val);
+        }
+        break;
+    case CT_TM_ICMP_REPLY:
+        if (tp_has_icmp_reply(tp, &val)) {
+            conn_update_expiration_with_policy(ct, conn, tm, now, val);
+        }
+        break;
+    case CT_TM_OTHER_FIRST:
+    case CT_TM_OTHER_BIDIR:
+    case CT_TM_OTHER_MULTIPLE:
+    case CT_TM_TCP_FIRST_PACKET:
+    case CT_TM_TCP_OPENING:
+    case CT_TM_TCP_ESTABLISHED:
+    case CT_TM_TCP_CLOSING:
+    case CT_TM_TCP_FIN_WAIT:
+    case CT_TM_TCP_CLOSED:
+    case N_CT_TM:
+        VLOG_WARN("%s case not handled", __func__);
+        break;
+    default:
+        conn_update_expiration(ct, conn, tm, now);
+        break;
+    }
+}
+
 static enum ct_update_res
 icmp_conn_update(struct conntrack *ct, struct conn *conn_,
                  struct dp_packet *pkt OVS_UNUSED, bool reply, long long now)
 {
-    uint32_t val;
-    struct timeout_policy *tp;
     struct conn_icmp *conn = conn_icmp_cast(conn_);
-
     conn->state = reply ? ICMPS_REPLY : ICMPS_FIRST;
-    
-    tp = timeout_policy_lookup(ct, conn_->tpid);
-
-    if (reply && tp_has_icmp_reply(tp, &val)) {
-        conn_update_expiration_with_policy(ct, &conn->up,
-                                           icmp_timeouts[conn->state],
-                                           now, val);
-    } else if (!reply && tp_has_icmp_first(tp, &val)) {
-        conn_update_expiration_with_policy(ct, &conn->up,
-                                           icmp_timeouts[conn->state],
-                                           now, val);
-    } else {
-        /* Use default policy. */
-        conn_update_expiration(ct, &conn->up, icmp_timeouts[conn->state], now);
-    }
+    icmp_conn_update_expiration(ct, &conn->up, icmp_timeouts[conn->state], now);
 
     return CT_UPDATE_VALID;
 }
