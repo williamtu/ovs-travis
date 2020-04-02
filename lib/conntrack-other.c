@@ -48,6 +48,7 @@ conn_other_cast(const struct conn *conn)
 static bool
 tp_has_udp_first(struct timeout_policy *tp, uint32_t *v) /* other first */
 {
+    VLOG_INFO("%s", __func__);
     if (!tp) {
         return false;
     }
@@ -62,6 +63,7 @@ tp_has_udp_first(struct timeout_policy *tp, uint32_t *v) /* other first */
 static bool
 tp_has_udp_single(struct timeout_policy *tp, uint32_t *v) /* other multiple */
 {
+    VLOG_INFO("%s", __func__);
     if (!tp) {
         return false;
     }
@@ -76,6 +78,7 @@ tp_has_udp_single(struct timeout_policy *tp, uint32_t *v) /* other multiple */
 static bool
 tp_has_udp_multiple(struct timeout_policy *tp, uint32_t *v) /* other bidir */
 {
+    VLOG_INFO("%s", __func__);
     if (!tp) {
         return false;
     }
@@ -95,6 +98,9 @@ other_conn_update_expiration(struct conntrack *ct, struct conn *conn,
     uint32_t val;
 
     tp = timeout_policy_lookup(ct, conn->tpid);
+    if (tp) {
+        VLOG_INFO("%s tpid = %d tm=%d", __func__, tp->p.id, tm);
+    }
     switch (tm) {
     case CT_TM_OTHER_FIRST:
         if (tp_has_udp_first(tp, &val)) {
@@ -123,6 +129,7 @@ other_conn_update_expiration(struct conntrack *ct, struct conn *conn,
         VLOG_WARN("%s case not handled", __func__);
         break;
     default:
+    VLOG_INFO("UDP use default");
         conn_update_expiration(ct, conn, tm, now);
         break;
     }
@@ -135,6 +142,7 @@ other_conn_update(struct conntrack *ct, struct conn *conn_,
     struct conn_other *conn = conn_other_cast(conn_);
     enum ct_update_res ret = CT_UPDATE_VALID;
 
+    VLOG_INFO("%s", __func__);
     if (reply && conn->state != OTHERS_BIDIR) {
         conn->state = OTHERS_BIDIR;
     } else if (conn->state == OTHERS_FIRST) {

@@ -149,7 +149,7 @@ enum ct_update_res {
 
 /* The smallest of the above values: it is used as an upper bound for the
  * interval between two rounds of cleanup of expired entries */
-#define CT_TM_MIN (30 * 1000)
+#define CT_TM_MIN (1 * 1000)
 
 #define CT_TIMEOUT(NAME, VAL) BUILD_ASSERT_DECL(VAL >= CT_TM_MIN);
     CT_TIMEOUTS

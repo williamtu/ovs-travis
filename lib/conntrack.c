@@ -143,9 +143,7 @@ detect_ftp_ctl_type(const struct conn_lookup_ctx *ctx,
 static void
 expectation_clean(struct conntrack *ct, const struct conn_key *master_key);
 
-// timeout policy
-void timeout_policy_init(struct conntrack *ct);
-struct timeout_policy * timeout_policy_get(struct conntrack *ct, int32_t tpid);
+static void timeout_policy_init(struct conntrack *ct);
 static int timeout_policy_create(struct conntrack *ct, struct timeout_policy *_tp);
 static void timeout_policy_clean(struct conntrack *ct, struct timeout_policy *tp);
 
@@ -374,6 +372,69 @@ zone_limit_get(struct conntrack *ct, int32_t zone)
     return czl;
 }
 
+static int
+zone_limit_create(struct conntrack *ct, int32_t zone, uint32_t limit)
+    OVS_REQUIRES(ct->ct_lock)
+{
+    if (zone >= DEFAULT_ZONE && zone <= MAX_ZONE) {
+        struct zone_limit *zl = xzalloc(sizeof *zl);
+        zl->czl.limit = limit;
+        zl->czl.zone = zone;
+        zl->czl.zone_limit_seq = ct->zone_limit_seq++;
+        uint32_t hash = zone_key_hash(zone, ct->hash_basis);
+        hmap_insert(&ct->zone_limits, &zl->node, hash);
+        return 0;
+    } else {
+        return EINVAL;
+    }
+}
+
+int
+zone_limit_update(struct conntrack *ct, int32_t zone, uint32_t limit)
+{
+    int err = 0;
+    ovs_mutex_lock(&ct->ct_lock);
+    struct zone_limit *zl = zone_limit_lookup(ct, zone);
+    if (zl) {
+        zl->czl.limit = limit;
+        VLOG_INFO("Changed zone limit of %u for zone %d", limit, zone);
+    } else {
+        err = zone_limit_create(ct, zone, limit);
+        if (!err) {
+            VLOG_INFO("Created zone limit of %u for zone %d", limit, zone);
+        } else {
+            VLOG_WARN("Request to create zone limit for invalid zone %d",
+                      zone);
+        }
+    }
+    ovs_mutex_unlock(&ct->ct_lock);
+    return err;
+}
+
+static void
+zone_limit_clean(struct conntrack *ct, struct zone_limit *zl)
+    OVS_REQUIRES(ct->ct_lock)
+{
+    hmap_remove(&ct->zone_limits, &zl->node);
+    free(zl);
+}
+
+int
+zone_limit_delete(struct conntrack *ct, uint16_t zone)
+{
+    ovs_mutex_lock(&ct->ct_lock);
+    struct zone_limit *zl = zone_limit_lookup(ct, zone);
+    if (zl) {
+        zone_limit_clean(ct, zl);
+        VLOG_INFO("Deleted zone limit for zone %d", zone);
+    } else {
+        VLOG_INFO("Attempted delete of non-existent zone limit: zone %d",
+                  zone);
+    }
+    ovs_mutex_unlock(&ct->ct_lock);
+    return 0;
+}
+
 struct timeout_policy *
 timeout_policy_get(struct conntrack *ct, int32_t tpid)
 {
@@ -482,7 +543,7 @@ static void
 timeout_policy_clean(struct conntrack *ct, struct timeout_policy *tp)
 //    OVS_REQUIRES(ct->ct_lock)
 {
-    hmap_remove(&ct->zone_limits, &tp->node);
+    hmap_remove(&ct->timeout_policies, &tp->node);
     free(tp);
 }
 
@@ -506,69 +567,6 @@ void
 timeout_policy_init(struct conntrack *ct)
 {
     hmap_init(&ct->timeout_policies);
-}
-
-static int
-zone_limit_create(struct conntrack *ct, int32_t zone, uint32_t limit)
-    OVS_REQUIRES(ct->ct_lock)
-{
-    if (zone >= DEFAULT_ZONE && zone <= MAX_ZONE) {
-        struct zone_limit *zl = xzalloc(sizeof *zl);
-        zl->czl.limit = limit;
-        zl->czl.zone = zone;
-        zl->czl.zone_limit_seq = ct->zone_limit_seq++;
-        uint32_t hash = zone_key_hash(zone, ct->hash_basis);
-        hmap_insert(&ct->zone_limits, &zl->node, hash);
-        return 0;
-    } else {
-        return EINVAL;
-    }
-}
-
-int
-zone_limit_update(struct conntrack *ct, int32_t zone, uint32_t limit)
-{
-    int err = 0;
-    ovs_mutex_lock(&ct->ct_lock);
-    struct zone_limit *zl = zone_limit_lookup(ct, zone);
-    if (zl) {
-        zl->czl.limit = limit;
-        VLOG_INFO("Changed zone limit of %u for zone %d", limit, zone);
-    } else {
-        err = zone_limit_create(ct, zone, limit);
-        if (!err) {
-            VLOG_INFO("Created zone limit of %u for zone %d", limit, zone);
-        } else {
-            VLOG_WARN("Request to create zone limit for invalid zone %d",
-                      zone);
-        }
-    }
-    ovs_mutex_unlock(&ct->ct_lock);
-    return err;
-}
-
-static void
-zone_limit_clean(struct conntrack *ct, struct zone_limit *zl)
-    OVS_REQUIRES(ct->ct_lock)
-{
-    hmap_remove(&ct->zone_limits, &zl->node);
-    free(zl);
-}
-
-int
-zone_limit_delete(struct conntrack *ct, uint16_t zone)
-{
-    ovs_mutex_lock(&ct->ct_lock);
-    struct zone_limit *zl = zone_limit_lookup(ct, zone);
-    if (zl) {
-        zone_limit_clean(ct, zl);
-        VLOG_INFO("Deleted zone limit for zone %d", zone);
-    } else {
-        VLOG_INFO("Attempted delete of non-existent zone limit: zone %d",
-                  zone);
-    }
-    ovs_mutex_unlock(&ct->ct_lock);
-    return 0;
 }
 
 static void
@@ -1109,6 +1107,7 @@ conn_not_found(struct conntrack *ct, struct dp_packet *pkt,
     struct conn *nc = NULL;
     struct conn *nat_conn = NULL;
 
+    VLOG_INFO("XXX %s ", __func__); 
     if (!valid_new(pkt, &ctx->key)) {
         pkt->md.ct_state = CS_INVALID;
         return nc;
@@ -1466,12 +1465,14 @@ process_one(struct conntrack *ct, struct dp_packet *pkt,
     enum ct_alg_ctl_type ct_alg_ctl = get_alg_ctl_type(pkt, tp_src, tp_dst,
                                                        helper);
 
+    VLOG_INFO("XXX %d %d ", tp_src, tp_dst);
     if (OVS_LIKELY(conn)) {
         if (OVS_LIKELY(!conn_update_state_alg(ct, pkt, ctx, conn,
                                               nat_action_info,
                                               ct_alg_ctl, now,
                                               &create_new_conn))) {
             conn->tpid = tpid;
+            VLOG_INFO("XXX2 %d %d ", tp_src, tp_dst);
             create_new_conn = conn_update_state(ct, pkt, ctx, conn, now); //pass tp->id? or add to struct conn
         }
         if (nat_action_info && !create_new_conn) {
@@ -1487,6 +1488,7 @@ process_one(struct conntrack *ct, struct dp_packet *pkt,
             pkt->md.ct_state = CS_INVALID;
         } else {
             create_new_conn = true;
+            VLOG_INFO("XXX create new conn  = true %d %d ", tp_src, tp_dst);
         }
     }
 
@@ -1509,7 +1511,9 @@ process_one(struct conntrack *ct, struct dp_packet *pkt,
         if (!conn_lookup(ct, &ctx->key, now, NULL, NULL)) {
             conn = conn_not_found(ct, pkt, ctx, commit, now, nat_action_info,
                                   helper, alg_exp, ct_alg_ctl);
+            //conn_update_state(ct, pkt, ctx, conn, now);
         }
+
         ovs_mutex_unlock(&ct->ct_lock);
     }
 
@@ -1560,12 +1564,14 @@ conntrack_execute(struct conntrack *ct, struct dp_packet_batch *pkt_batch,
             write_ct_md(packet, zone, NULL, NULL, NULL);
         } else if (conn && conn->key.zone == zone && !force
                    && !get_alg_ctl_type(packet, tp_src, tp_dst, helper)) {
+            VLOG_INFO("process_one_fast");
             process_one_fast(zone, setmark, setlabel, nat_action_info,
                              conn, packet);
         } else if (OVS_UNLIKELY(!conn_key_extract(ct, packet, dl_type, &ctx,
                                 zone))) {
             packet->md.ct_state = CS_INVALID;
             write_ct_md(packet, zone, NULL, NULL, NULL);
+            VLOG_INFO("CS_INVALID");
         } else {
             process_one(ct, packet, &ctx, zone, force, commit, now, setmark,
                         setlabel, nat_action_info, tp_src, tp_dst, helper, tpid);
@@ -1691,14 +1697,14 @@ conntrack_clean(struct conntrack *ct, long long now)
  * - We want to reduce the number of wakeups and batch connection cleanup
  *   when the load is not very high.  CT_CLEAN_INTERVAL ensures that if we
  *   are coping with the current cleanup tasks, then we wait at least
- *   5 seconds to do further cleanup.
+ *   1 seconds to do further cleanup.
  *
  * - We don't want to keep the map locked too long, as we might prevent
  *   traffic from flowing.  CT_CLEAN_MIN_INTERVAL ensures that if cleanup is
  *   behind, there is at least some 200ms blocks of time when the map will be
  *   left alone, so the datapath can operate unhindered.
  */
-#define CT_CLEAN_INTERVAL 5000 /* 5 seconds */
+#define CT_CLEAN_INTERVAL 1000 /* 1 second */
 #define CT_CLEAN_MIN_INTERVAL 200  /* 0.2 seconds */
 
 static void *
@@ -2472,6 +2478,7 @@ conn_update(struct conntrack *ct, struct conn *conn, struct dp_packet *pkt,
 {
     ovs_mutex_lock(&conn->lock);
 
+VLOG_INFO("%s proto %d", __func__, conn->key.nw_proto);
     enum ct_update_res update_res =
         l4_protos[conn->key.nw_proto]->conn_update(ct, conn, pkt, ctx->reply,
                                                    now);

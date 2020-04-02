@@ -129,10 +129,6 @@ struct timeout_policy_value {
 struct timeout_policy {
     struct hmap_node node;
     struct ct_dpif_timeout_policy p;
-
-    //uint32_t id;
-    //uint32_t present;
-    //struct timeout_policy_value v;
 };
 
 enum {
