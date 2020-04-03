@@ -614,7 +614,7 @@ tcp_new_conn(struct conntrack *ct, struct dp_packet *pkt, long long now)
     src->state = CT_DPIF_TCPS_SYN_SENT;
     dst->state = CT_DPIF_TCPS_CLOSED;
 
-    conn_init_expiration(ct, &newconn->up, CT_TM_TCP_FIRST_PACKET, now);
+    conn_init_expiration(ct, &newconn->up, CT_TM_TCP_FIRST_PACKET, now, 0, false);
 
     return &newconn->up;
 }

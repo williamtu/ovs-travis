@@ -144,7 +144,7 @@ enum ct_update_res {
     CT_TIMEOUT(OTHER_FIRST, 60 * 1000) \
     CT_TIMEOUT(OTHER_MULTIPLE, 60 * 1000) \
     CT_TIMEOUT(OTHER_BIDIR, 30 * 1000) \
-    CT_TIMEOUT(ICMP_FIRST, 60 * 1000) \
+    CT_TIMEOUT(ICMP_FIRST, 30 * 1000) \
     CT_TIMEOUT(ICMP_REPLY, 30 * 1000)
 
 /* The smallest of the above values: it is used as an upper bound for the
@@ -217,9 +217,14 @@ extern long long ct_timeout_val[];
 /* ct_lock must be held. */
 static inline void
 conn_init_expiration(struct conntrack *ct, struct conn *conn,
-                     enum ct_timeout tm, long long now)
+                     enum ct_timeout tm, long long now,
+                     uint32_t tp_value, bool use_default)
 {
-    conn->expiration = now + ct_timeout_val[tm];
+    if (use_default) {
+        conn->expiration = now + ct_timeout_val[tm];
+    } else {
+        conn->expiration = now + tp_value * 1000; 
+    }
     ovs_list_push_back(&ct->exp_lists[tm], &conn->exp_node);
 }
 

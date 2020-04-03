@@ -97,6 +97,7 @@ other_conn_update_expiration(struct conntrack *ct, struct conn *conn,
     struct timeout_policy *tp;
     uint32_t val;
 
+    VLOG_INFO("%s", __func__);
     tp = timeout_policy_lookup(ct, conn->tpid);
     if (tp) {
         VLOG_INFO("%s tpid = %d tm=%d", __func__, tp->p.id, tm);
@@ -105,16 +106,19 @@ other_conn_update_expiration(struct conntrack *ct, struct conn *conn,
     case CT_TM_OTHER_FIRST:
         if (tp_has_udp_first(tp, &val)) {
             conn_update_expiration_with_policy(ct, conn, tm, now, val);
+            return;
         }
         break;
     case CT_TM_OTHER_BIDIR:
         if (tp_has_udp_single(tp, &val)) {
             conn_update_expiration_with_policy(ct, conn, tm, now, val);
+            return;
         }
         break;
     case CT_TM_OTHER_MULTIPLE:
         if (tp_has_udp_multiple(tp, &val)) {
             conn_update_expiration_with_policy(ct, conn, tm, now, val);
+            return;
         }
         break;
     case CT_TM_ICMP_FIRST:
@@ -126,13 +130,12 @@ other_conn_update_expiration(struct conntrack *ct, struct conn *conn,
     case CT_TM_TCP_FIN_WAIT:
     case CT_TM_TCP_CLOSED:
     case N_CT_TM:
+    default:
         VLOG_WARN("%s case not handled", __func__);
         break;
-    default:
-    VLOG_INFO("UDP use default");
-        conn_update_expiration(ct, conn, tm, now);
-        break;
     }
+    VLOG_INFO("UDP use default");
+    conn_update_expiration(ct, conn, tm, now);
 }
 
 static enum ct_update_res
@@ -161,6 +164,54 @@ other_valid_new(struct dp_packet *pkt OVS_UNUSED)
     return true;
 }
 
+static inline void
+other_conn_init_expiration(struct conntrack *ct, struct conn *conn,
+                             enum ct_timeout tm, long long now)
+{
+    struct timeout_policy *tp;
+    uint32_t val;
+
+    tp = timeout_policy_lookup(ct, conn->tpid);
+    if (tp) {
+        VLOG_INFO("%s tpid = %d tm=%d", __func__, tp->p.id, tm);
+    }
+    switch (tm) {
+    case CT_TM_OTHER_FIRST:
+        if (tp_has_udp_first(tp, &val)) {
+            conn_init_expiration(ct, conn, tm, now, val, true);
+            return;
+        }
+        break;
+    case CT_TM_OTHER_BIDIR:
+        if (tp_has_udp_single(tp, &val)) {
+            conn_init_expiration(ct, conn, tm, now, val, true);
+            return;
+        }
+        break;
+    case CT_TM_OTHER_MULTIPLE:
+        if (tp_has_udp_multiple(tp, &val)) {
+            conn_init_expiration(ct, conn, tm, now, val, true);
+            return;
+        }
+        break;
+    case CT_TM_ICMP_FIRST:
+    case CT_TM_ICMP_REPLY:
+    case CT_TM_TCP_FIRST_PACKET:
+    case CT_TM_TCP_OPENING:
+    case CT_TM_TCP_ESTABLISHED:
+    case CT_TM_TCP_CLOSING:
+    case CT_TM_TCP_FIN_WAIT:
+    case CT_TM_TCP_CLOSED:
+    case N_CT_TM:
+    default:
+        VLOG_WARN("%s case not handled", __func__);
+        break;
+    }
+
+    VLOG_INFO("UDP use init default");
+    conn_init_expiration(ct, conn, tm, now, 0, false);
+}
+
 static struct conn *
 other_new_conn(struct conntrack *ct, struct dp_packet *pkt OVS_UNUSED,
                long long now)
@@ -170,7 +221,7 @@ other_new_conn(struct conntrack *ct, struct dp_packet *pkt OVS_UNUSED,
     conn = xzalloc(sizeof *conn);
     conn->state = OTHERS_FIRST;
 
-    conn_init_expiration(ct, &conn->up, other_timeouts[conn->state], now);
+    conn_init_expiration(ct, &conn->up, other_timeouts[conn->state], now, 0, false);
 
     return &conn->up;
 }
