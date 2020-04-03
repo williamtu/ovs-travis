@@ -228,32 +228,11 @@ conn_init_expiration(struct conntrack *ct, struct conn *conn,
     ovs_list_push_back(&ct->exp_lists[tm], &conn->exp_node);
 }
 
-#define TIMEOUT_DEFAULT 100
-static inline void
-conn_update_expiration_with_policy(struct conntrack *ct, struct conn *conn,
-                                   enum ct_timeout tm, long long now,
-                                   uint32_t tp_value)
-    OVS_NO_THREAD_SAFETY_ANALYSIS
-{
-    ovs_mutex_unlock(&conn->lock);
-
-    ovs_mutex_lock(&ct->ct_lock);
-    ovs_mutex_lock(&conn->lock);
-    if (!conn->cleaned) {
-        conn->expiration = now + tp_value * 1000;
-        ovs_list_remove(&conn->exp_node);
-        ovs_list_push_back(&ct->exp_lists[tm], &conn->exp_node);
-    }
-    ovs_mutex_unlock(&conn->lock);
-    ovs_mutex_unlock(&ct->ct_lock);
-
-    ovs_mutex_lock(&conn->lock);
-}
-
 /* The conn entry lock must be held on entry and exit. */
 static inline void
 conn_update_expiration(struct conntrack *ct, struct conn *conn,
-                       enum ct_timeout tm, long long now)
+                       enum ct_timeout tm, long long now,
+                       uint32_t tp_value, bool use_default)
     OVS_NO_THREAD_SAFETY_ANALYSIS
 {
     ovs_mutex_unlock(&conn->lock);
@@ -261,7 +240,11 @@ conn_update_expiration(struct conntrack *ct, struct conn *conn,
     ovs_mutex_lock(&ct->ct_lock);
     ovs_mutex_lock(&conn->lock);
     if (!conn->cleaned) {
-        conn->expiration = now + ct_timeout_val[tm];
+        if (use_default) {
+            conn->expiration = now + ct_timeout_val[tm];
+        } else {
+            conn->expiration = now + tp_value * 1000;
+        }
         ovs_list_remove(&conn->exp_node);
         ovs_list_push_back(&ct->exp_lists[tm], &conn->exp_node);
     }
