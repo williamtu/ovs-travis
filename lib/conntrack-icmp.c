@@ -148,7 +148,7 @@ icmp_new_conn(struct conntrack *ct, struct dp_packet *pkt OVS_UNUSED,
 {
     struct conn_icmp *conn = xzalloc(sizeof *conn);
     conn->state = ICMPS_FIRST;
-    conn_init_expiration(ct, &conn->up, icmp_timeouts[conn->state], now, 0, false);
+    conn_init_expiration(ct, &conn->up, icmp_timeouts[conn->state], now, 0, true);
 
     return &conn->up;
 }

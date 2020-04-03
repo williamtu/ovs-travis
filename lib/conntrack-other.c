@@ -178,19 +178,19 @@ other_conn_init_expiration(struct conntrack *ct, struct conn *conn,
     switch (tm) {
     case CT_TM_OTHER_FIRST:
         if (tp_has_udp_first(tp, &val)) {
-            conn_init_expiration(ct, conn, tm, now, val, true);
+            conn_init_expiration(ct, conn, tm, now, val, false);
             return;
         }
         break;
     case CT_TM_OTHER_BIDIR:
         if (tp_has_udp_single(tp, &val)) {
-            conn_init_expiration(ct, conn, tm, now, val, true);
+            conn_init_expiration(ct, conn, tm, now, val, false);
             return;
         }
         break;
     case CT_TM_OTHER_MULTIPLE:
         if (tp_has_udp_multiple(tp, &val)) {
-            conn_init_expiration(ct, conn, tm, now, val, true);
+            conn_init_expiration(ct, conn, tm, now, val, false);
             return;
         }
         break;
@@ -209,7 +209,7 @@ other_conn_init_expiration(struct conntrack *ct, struct conn *conn,
     }
 
     VLOG_INFO("UDP use init default");
-    conn_init_expiration(ct, conn, tm, now, 0, false);
+    conn_init_expiration(ct, conn, tm, now, 0, true);
 }
 
 static struct conn *
@@ -221,7 +221,7 @@ other_new_conn(struct conntrack *ct, struct dp_packet *pkt OVS_UNUSED,
     conn = xzalloc(sizeof *conn);
     conn->state = OTHERS_FIRST;
 
-    conn_init_expiration(ct, &conn->up, other_timeouts[conn->state], now, 0, false);
+    other_conn_init_expiration(ct, &conn->up, other_timeouts[conn->state], now);
 
     return &conn->up;
 }
