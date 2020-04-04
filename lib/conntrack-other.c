@@ -81,7 +81,8 @@ other_new_conn(struct conntrack *ct, struct dp_packet *pkt OVS_UNUSED,
     conn = xzalloc(sizeof *conn);
     conn->state = OTHERS_FIRST;
 
-    other_conn_init_expiration(ct, &conn->up, other_timeouts[conn->state], now);
+    conn_init_expiration_with_tp(ct, &conn->up, other_timeouts[conn->state],
+                                 now);
 
     return &conn->up;
 }

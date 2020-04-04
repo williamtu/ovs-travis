@@ -18,16 +18,13 @@
 #ifndef CONNTRACK_TP_H
 #define CONNTRACK_TP_H 1
 
-void icmp_conn_init_expiration(struct conntrack *ct, struct conn *conn,
-                               enum ct_timeout tm, long long now);
+void conn_init_expiration_with_tp(struct conntrack *ct, struct conn *conn,
+                                  enum ct_timeout tm, long long now);
+
 void icmp_conn_update_expiration(struct conntrack *ct, struct conn *conn,
                                  enum ct_timeout tm, long long now);
-void tcp_conn_init_expiration(struct conntrack *ct, struct conn *conn,
-                              enum ct_timeout tm, long long now);
 void tcp_conn_update_expiration(struct conntrack *ct, struct conn *conn,
                                  enum ct_timeout tm, long long now);
-void other_conn_init_expiration(struct conntrack *ct, struct conn *conn,
-                                enum ct_timeout tm, long long now);
 void other_conn_update_expiration(struct conntrack *ct, struct conn *conn,
                                   enum ct_timeout tm, long long now);
 #endif

@@ -288,10 +288,9 @@ conn_init_expiration_with_policy(struct conntrack *ct, struct conn *conn,
 }
 
 void
-icmp_conn_init_expiration(struct conntrack *ct, struct conn *conn,
-                          enum ct_timeout tm, long long now)
+conn_init_expiration_with_tp(struct conntrack *ct, struct conn *conn,
+                             enum ct_timeout tm, long long now)
 {
-    VLOG_INFO("ICMP init");
     conn_init_expiration_with_policy(ct, conn, tm, now);
 }
 
@@ -304,27 +303,11 @@ icmp_conn_update_expiration(struct conntrack *ct, struct conn *conn,
 }
 
 void
-tcp_conn_init_expiration(struct conntrack *ct, struct conn *conn,
-                          enum ct_timeout tm, long long now)
-{
-    VLOG_INFO("ICMP use init default");
-    conn_init_expiration_with_policy(ct, conn, tm, now);
-}
-
-void
 tcp_conn_update_expiration(struct conntrack *ct, struct conn *conn,
                            enum ct_timeout tm, long long now)
 {
     VLOG_INFO("TCP update");
     conn_update_expiration_with_policy(ct, conn, tm, now);
-}
-
-void
-other_conn_init_expiration(struct conntrack *ct, struct conn *conn,
-                             enum ct_timeout tm, long long now)
-{
-    VLOG_INFO("UDP use init default");
-    conn_init_expiration_with_policy(ct, conn, tm, now);
 }
 
 void
