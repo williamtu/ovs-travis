@@ -187,7 +187,6 @@ conn_update_expiration_with_policy(struct conntrack *ct, struct conn *conn,
     struct timeout_policy *tp;
     uint32_t val;
 
-    VLOG_INFO("%s", __func__);
     tp = timeout_policy_lookup(ct, conn->tpid);
     if (tp) {
         VLOG_INFO("%s tpid = %d tm=%d", __func__, tp->p.id, tm);
@@ -211,9 +210,10 @@ conn_update_expiration_with_policy(struct conntrack *ct, struct conn *conn,
             return;
         }
         break;
-    case CT_TM_ICMP_FIRST:
+    case CT_TM_ICMP_FIRST: //9
         if (tp_has_icmp_first(tp, &val)) {
             conn_update_expiration(ct, conn, tm, now, val, false);
+            VLOG_INFO("now %llu exp %llu", now, conn->expiration);
             return;
         }
         break;
@@ -264,6 +264,7 @@ conn_update_expiration_with_policy(struct conntrack *ct, struct conn *conn,
         VLOG_WARN("%s case not handled", __func__);
         break;
     }
+    VLOG_INFO("use default for tm %d", tm);
     conn_update_expiration(ct, conn, tm, now, 0, true);
 }
 
@@ -328,7 +329,7 @@ void
 icmp_conn_init_expiration(struct conntrack *ct, struct conn *conn,
                           enum ct_timeout tm, long long now)
 {
-    VLOG_INFO("ICMP use init default");
+    VLOG_INFO("ICMP init");
     conn_init_expiration_with_policy(ct, conn, tm, now);
 }
 

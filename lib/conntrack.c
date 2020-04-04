@@ -1107,7 +1107,6 @@ conn_not_found(struct conntrack *ct, struct dp_packet *pkt,
     struct conn *nc = NULL;
     struct conn *nat_conn = NULL;
 
-    VLOG_INFO("XXX %s ", __func__); 
     if (!valid_new(pkt, &ctx->key)) {
         pkt->md.ct_state = CS_INVALID;
         return nc;
@@ -1465,14 +1464,12 @@ process_one(struct conntrack *ct, struct dp_packet *pkt,
     enum ct_alg_ctl_type ct_alg_ctl = get_alg_ctl_type(pkt, tp_src, tp_dst,
                                                        helper);
 
-    VLOG_INFO("XXX %d %d ", tp_src, tp_dst);
     if (OVS_LIKELY(conn)) {
         if (OVS_LIKELY(!conn_update_state_alg(ct, pkt, ctx, conn,
                                               nat_action_info,
                                               ct_alg_ctl, now,
                                               &create_new_conn))) {
             conn->tpid = tpid;
-            VLOG_INFO("XXX2 %d %d ", tp_src, tp_dst);
             create_new_conn = conn_update_state(ct, pkt, ctx, conn, now); //pass tp->id? or add to struct conn
         }
         if (nat_action_info && !create_new_conn) {
@@ -1488,7 +1485,6 @@ process_one(struct conntrack *ct, struct dp_packet *pkt,
             pkt->md.ct_state = CS_INVALID;
         } else {
             create_new_conn = true;
-            VLOG_INFO("XXX create new conn  = true %d %d ", tp_src, tp_dst);
         }
     }
 
@@ -1644,6 +1640,7 @@ ct_sweep(struct conntrack *ct, long long now, size_t limit)
 
     for (unsigned i = 0; i < N_CT_TM; i++) {
         LIST_FOR_EACH_SAFE (conn, next, exp_node, &ct->exp_lists[i]) {
+            VLOG_INFO("i = %d  now = %llu", i, now);
             ovs_mutex_lock(&conn->lock);
             if (now < conn->expiration || count >= limit) {
                 min_expiration = MIN(min_expiration, conn->expiration);
