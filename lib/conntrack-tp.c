@@ -218,6 +218,7 @@ conn_update_expiration_with_policy(struct conntrack *ct, struct conn *conn,
         }
         break;
     case CT_TM_ICMP_REPLY:
+        return;
         if (tp_has_icmp_reply(tp, &val)) {
             conn_update_expiration(ct, conn, tm, now, val, false);
             return;
@@ -305,6 +306,7 @@ conn_init_expiration_with_policy(struct conntrack *ct, struct conn *conn,
         }
         break;
     case CT_TM_ICMP_REPLY:
+        return;
         if (tp_has_icmp_reply(tp, &val)) {
             conn_init_expiration(ct, conn, tm, now, val, false);
             return;
