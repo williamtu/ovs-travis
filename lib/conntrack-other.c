@@ -61,8 +61,9 @@ other_conn_update(struct conntrack *ct, struct conn *conn_,
         ret = CT_UPDATE_VALID_NEW;
     }
 
-    other_conn_update_expiration(ct, &conn->up, other_timeouts[conn->state], now);
-
+    conn_update_expiration_with_tp(ct, &conn->up,
+                                   other_timeouts[conn->state],
+                                   now);
     return ret;
 }
 

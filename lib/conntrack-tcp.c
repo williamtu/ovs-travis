@@ -193,7 +193,8 @@ tcp_conn_update(struct conntrack *ct, struct conn *conn_,
             return CT_UPDATE_NEW;
         } else if (src->state <= CT_DPIF_TCPS_SYN_SENT) {
             src->state = CT_DPIF_TCPS_SYN_SENT;
-            tcp_conn_update_expiration(ct, &conn->up, CT_TM_TCP_FIRST_PACKET, now);
+            conn_update_expiration_with_tp(ct, &conn->up,
+                                           CT_TM_TCP_FIRST_PACKET, now);
             return CT_UPDATE_VALID_NEW;
         }
     }
@@ -344,18 +345,23 @@ tcp_conn_update(struct conntrack *ct, struct conn *conn_,
 
         if (src->state >= CT_DPIF_TCPS_FIN_WAIT_2
             && dst->state >= CT_DPIF_TCPS_FIN_WAIT_2) {
-            tcp_conn_update_expiration(ct, &conn->up, CT_TM_TCP_CLOSED, now);
+            conn_update_expiration_with_tp(ct, &conn->up, CT_TM_TCP_CLOSED,
+                                           now);
         } else if (src->state >= CT_DPIF_TCPS_CLOSING
                    && dst->state >= CT_DPIF_TCPS_CLOSING) {
-            tcp_conn_update_expiration(ct, &conn->up, CT_TM_TCP_FIN_WAIT, now);
+            conn_update_expiration_with_tp(ct, &conn->up, CT_TM_TCP_FIN_WAIT,
+                                           now);
         } else if (src->state < CT_DPIF_TCPS_ESTABLISHED
                    || dst->state < CT_DPIF_TCPS_ESTABLISHED) {
-            tcp_conn_update_expiration(ct, &conn->up, CT_TM_TCP_OPENING, now);
+            conn_update_expiration_with_tp(ct, &conn->up, CT_TM_TCP_OPENING,
+                                           now);
         } else if (src->state >= CT_DPIF_TCPS_CLOSING
                    || dst->state >= CT_DPIF_TCPS_CLOSING) {
-            tcp_conn_update_expiration(ct, &conn->up, CT_TM_TCP_CLOSING, now);
+            conn_update_expiration_with_tp(ct, &conn->up, CT_TM_TCP_CLOSING,
+                                           now);
         } else {
-            tcp_conn_update_expiration(ct, &conn->up, CT_TM_TCP_ESTABLISHED, now);
+            conn_update_expiration_with_tp(ct, &conn->up,
+                                           CT_TM_TCP_ESTABLISHED, now);
         }
     } else if ((dst->state < CT_DPIF_TCPS_SYN_SENT
                 || dst->state >= CT_DPIF_TCPS_FIN_WAIT_2

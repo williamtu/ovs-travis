@@ -295,25 +295,8 @@ conn_init_expiration_with_tp(struct conntrack *ct, struct conn *conn,
 }
 
 void
-icmp_conn_update_expiration(struct conntrack *ct, struct conn *conn,
-                            enum ct_timeout tm, long long now)
+conn_update_expiration_with_tp(struct conntrack *ct, struct conn *conn,
+                               enum ct_timeout tm, long long now)
 {
-    VLOG_INFO("ICMP update");
-    conn_update_expiration_with_policy(ct, conn, tm, now);
-}
-
-void
-tcp_conn_update_expiration(struct conntrack *ct, struct conn *conn,
-                           enum ct_timeout tm, long long now)
-{
-    VLOG_INFO("TCP update");
-    conn_update_expiration_with_policy(ct, conn, tm, now);
-}
-
-void
-other_conn_update_expiration(struct conntrack *ct, struct conn *conn,
-                             enum ct_timeout tm, long long now)
-{
-    VLOG_INFO("Update %s", ct_timeout_str[tm]);
     conn_update_expiration_with_policy(ct, conn, tm, now);
 }

@@ -55,7 +55,8 @@ icmp_conn_update(struct conntrack *ct, struct conn *conn_,
 {
     struct conn_icmp *conn = conn_icmp_cast(conn_);
     conn->state = reply ? ICMPS_REPLY : ICMPS_FIRST;
-    icmp_conn_update_expiration(ct, &conn->up, icmp_timeouts[conn->state], now);
+    conn_update_expiration_with_tp(ct, &conn->up, icmp_timeouts[conn->state],
+                                   now);
 
     return CT_UPDATE_VALID;
 }
