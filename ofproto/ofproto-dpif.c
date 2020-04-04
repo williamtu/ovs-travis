@@ -5605,7 +5605,6 @@ ofproto_dpif_ct_zone_timeout_policy_get_name(
                                         nw_proto, tp_name, &is_generic)) {
         return false;
     }
-    VLOG_WARN("%s timeout policy name %s", __func__, *tp_name);
     /* Unwildcard datapath flow if it is not a generic timeout policy. */
     *unwildcard = !is_generic;
     return true;

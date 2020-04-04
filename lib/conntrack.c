@@ -443,7 +443,7 @@ timeout_policy_get(struct conntrack *ct, int32_t tpid)
     ovs_mutex_lock(&ct->ct_lock);
     tp = timeout_policy_lookup(ct, tpid);
     if (!tp) {
-        VLOG_WARN("no timeout policy, return default!");
+        VLOG_INFO("no timeout policy, return default!");
         // FIXME
     }
 
@@ -460,11 +460,9 @@ timeout_policy_lookup(struct conntrack *ct, int32_t tpid)
     hash = zone_key_hash(tpid, ct->hash_basis);
     HMAP_FOR_EACH_IN_BUCKET (tp, node, hash, &ct->timeout_policies) {
         if (tp->p.id == tpid) {
-            VLOG_WARN("tpid %d found", tpid);
             return tp;
         }
     }
-    VLOG_WARN("tpid %d not found", tpid);
     return NULL;
 }
 
@@ -481,7 +479,6 @@ timeout_policy_create(struct conntrack *ct,
     uint32_t tpid = new_tp->p.id;
     uint32_t hash;
 
-    VLOG_WARN("%s tpid %d", __func__, tpid);
     if (is_valid_tpid(tpid)) {
         struct timeout_policy *tp;
 
@@ -1552,22 +1549,18 @@ conntrack_execute(struct conntrack *ct, struct dp_packet_batch *pkt_batch,
     struct dp_packet *packet;
     struct conn_lookup_ctx ctx;
 
-    VLOG_WARN("%s tpid %d", __func__, tpid);
-
     DP_PACKET_BATCH_FOR_EACH (i, packet, pkt_batch) {
         struct conn *conn = packet->md.conn;
         if (OVS_UNLIKELY(packet->md.ct_state == CS_INVALID)) {
             write_ct_md(packet, zone, NULL, NULL, NULL);
         } else if (conn && conn->key.zone == zone && !force
                    && !get_alg_ctl_type(packet, tp_src, tp_dst, helper)) {
-            VLOG_INFO("process_one_fast");
             process_one_fast(zone, setmark, setlabel, nat_action_info,
                              conn, packet);
         } else if (OVS_UNLIKELY(!conn_key_extract(ct, packet, dl_type, &ctx,
                                 zone))) {
             packet->md.ct_state = CS_INVALID;
             write_ct_md(packet, zone, NULL, NULL, NULL);
-            VLOG_INFO("CS_INVALID");
         } else {
             process_one(ct, packet, &ctx, zone, force, commit, now, setmark,
                         setlabel, nat_action_info, tp_src, tp_dst, helper, tpid);

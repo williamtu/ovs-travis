@@ -7372,13 +7372,9 @@ dp_execute_cb(void *aux_, struct dp_packet_batch *packets_,
                  * netlink events. */
                 break;
             case OVS_CT_ATTR_TIMEOUT:
-                /* Userspace datapath does not support customized timeout
-                 * policy yet. */
-                 // get string and convert to u32
                 if (!str_to_uint(nl_attr_get_string(b), 10, &tpid)) {
                     VLOG_FATAL("convert failed");
                 }
-                VLOG_WARN("%s get tpid %d", __func__, tpid);
                 break;
             case OVS_CT_ATTR_NAT: {
                 const struct nlattr *b_nest;
@@ -7705,7 +7701,6 @@ dpif_netdev_ct_set_timeout_policy(struct dpif *dpif,
     struct dp_netdev *dp;
     int err = 0;
 
-    VLOG_WARN("%s tp id %d", __func__, dpif_tp->id);
     dp = get_dp_netdev(dpif);
     memcpy(&tp.p, dpif_tp, sizeof tp.p);
     err = timeout_policy_update(dp->conntrack, &tp);

@@ -23,15 +23,17 @@
 #include "openvswitch/vlog.h"
 VLOG_DEFINE_THIS_MODULE(conntrack_tp);
 
+static const char *ct_timeout_str[] = {
+#define CT_TIMEOUT(NAME, VALUE) #NAME
+    CT_TIMEOUTS
+#undef CT_TIMEOUT
+};
+
 static bool
 tp_has_icmp_reply(struct timeout_policy *tp, uint32_t *v)
 {
-    if (!tp) {
-        return false;
-    }
-    if (tp->p.present & (1 << CT_DPIF_TP_ATTR_ICMP_REPLY)) {
+    if (tp && (tp->p.present & (1 << CT_DPIF_TP_ATTR_ICMP_REPLY))) {
         *v = tp->p.attrs[CT_DPIF_TP_ATTR_ICMP_REPLY];
-        VLOG_WARN("set icmp reply to %d", *v);
         return true;
     }
     return false;
@@ -40,111 +42,77 @@ tp_has_icmp_reply(struct timeout_policy *tp, uint32_t *v)
 static bool
 tp_has_icmp_first(struct timeout_policy *tp, uint32_t *v)
 {
-    if (!tp) {
-        return false;
-    }
-    if (tp->p.present & (1 << CT_DPIF_TP_ATTR_ICMP_FIRST)) {
+    if (tp && (tp->p.present & (1 << CT_DPIF_TP_ATTR_ICMP_FIRST))) {
         *v = tp->p.attrs[CT_DPIF_TP_ATTR_ICMP_FIRST];
-        VLOG_WARN("set icmp first to %d", *v);
         return true;
     }
     return false;
 }
 
 static bool
-tp_has_udp_first(struct timeout_policy *tp, uint32_t *v) /* other first */
+tp_has_udp_first(struct timeout_policy *tp, uint32_t *v)
 {
-    VLOG_INFO("%s", __func__);
-    if (!tp) {
-        return false;
-    }
-    if (tp->p.present & (1 << CT_DPIF_TP_ATTR_UDP_FIRST)) {
+    if (tp && (tp->p.present & (1 << CT_DPIF_TP_ATTR_UDP_FIRST))) {
         *v = tp->p.attrs[CT_DPIF_TP_ATTR_UDP_FIRST];
-        VLOG_WARN("set udp first");
         return true;
     }
     return false;
 }
 
 static bool
-tp_has_udp_single(struct timeout_policy *tp, uint32_t *v) /* other multiple */
+tp_has_udp_single(struct timeout_policy *tp, uint32_t *v)
 {
-    VLOG_INFO("%s", __func__);
-    if (!tp) {
-        return false;
-    }
-    if (tp->p.present & (1 << CT_DPIF_TP_ATTR_UDP_SINGLE)) {
+    if (tp && (tp->p.present & (1 << CT_DPIF_TP_ATTR_UDP_SINGLE))) {
         *v = tp->p.attrs[CT_DPIF_TP_ATTR_UDP_SINGLE];
-        VLOG_WARN("set udp single");
         return true;
     }
     return false;
 }
 
 static bool
-tp_has_udp_multiple(struct timeout_policy *tp, uint32_t *v) /* other bidir */
+tp_has_udp_multiple(struct timeout_policy *tp, uint32_t *v)
 {
-    VLOG_INFO("%s", __func__);
-    if (!tp) {
-        return false;
-    }
-    if (tp->p.present & (1 << CT_DPIF_TP_ATTR_UDP_MULTIPLE)) {
+    if (tp && (tp->p.present & (1 << CT_DPIF_TP_ATTR_UDP_MULTIPLE))) {
         *v = tp->p.attrs[CT_DPIF_TP_ATTR_UDP_MULTIPLE];
-        VLOG_WARN("set udp multiple");
         return true;
     }
     return false;
 }
 
 static bool
-tp_has_tcp_syn_sent(struct timeout_policy *tp, uint32_t *v) /* first packet */
+tp_has_tcp_syn_sent(struct timeout_policy *tp, uint32_t *v)
 {
-    if (!tp) {
-        return false;
-    }
-    if (tp->p.present & (1 << CT_DPIF_TP_ATTR_TCP_SYN_SENT)) {
+    if (tp && (tp->p.present & (1 << CT_DPIF_TP_ATTR_TCP_SYN_SENT))) {
         *v = tp->p.attrs[CT_DPIF_TP_ATTR_TCP_SYN_SENT];
-        VLOG_WARN("set tcp first packet");
         return true;
     }
     return false;
 }
 
 static bool
-tp_has_tcp_syn_recv(struct timeout_policy *tp, uint32_t *v) /* tcp opening */
+tp_has_tcp_syn_recv(struct timeout_policy *tp, uint32_t *v)
 {
-    if (!tp) {
-        return false;
-    }
-    if (tp->p.present & (1 << CT_DPIF_TP_ATTR_TCP_SYN_RECV)) {
+    if (tp && (tp->p.present & (1 << CT_DPIF_TP_ATTR_TCP_SYN_RECV))) {
         *v = tp->p.attrs[CT_DPIF_TP_ATTR_TCP_SYN_RECV];
-        VLOG_WARN("set tcp opening");
         return true;
     }
     return false;
 }
 
 static bool
-tp_has_tcp_established(struct timeout_policy *tp, uint32_t *v) /* tcp established */
+tp_has_tcp_established(struct timeout_policy *tp, uint32_t *v)
 {
-    if (!tp) {
-        return false;
-    }
-    if (tp->p.present & (1 << CT_DPIF_TP_ATTR_TCP_ESTABLISHED)) {
+    if (tp && (tp->p.present & (1 << CT_DPIF_TP_ATTR_TCP_ESTABLISHED))) {
         *v = tp->p.attrs[CT_DPIF_TP_ATTR_TCP_ESTABLISHED];
-        VLOG_WARN("set tcp est");
         return true;
     }
     return false;
 }
 
 static bool
-tp_has_tcp_fin_wait(struct timeout_policy *tp, uint32_t *v) /* tcp closing */
+tp_has_tcp_fin_wait(struct timeout_policy *tp, uint32_t *v)
 {
-    if (!tp) {
-        return false;
-    }
-    if (tp->p.present & (1 << CT_DPIF_TP_ATTR_TCP_FIN_WAIT)) {
+    if (tp && (tp->p.present & (1 << CT_DPIF_TP_ATTR_TCP_FIN_WAIT))) {
         *v = tp->p.attrs[CT_DPIF_TP_ATTR_TCP_FIN_WAIT];
         VLOG_WARN("set tcp closing");
         return true;
@@ -153,28 +121,20 @@ tp_has_tcp_fin_wait(struct timeout_policy *tp, uint32_t *v) /* tcp closing */
 }
 
 static bool
-tp_has_tcp_time_wait(struct timeout_policy *tp, uint32_t *v) /* tcp fin wait */
+tp_has_tcp_time_wait(struct timeout_policy *tp, uint32_t *v)
 {
-    if (!tp) {
-        return false;
-    }
-    if (tp->p.present & (1 << CT_DPIF_TP_ATTR_TCP_TIME_WAIT)) {
+    if (tp && (tp->p.present & (1 << CT_DPIF_TP_ATTR_TCP_TIME_WAIT))) {
         *v = tp->p.attrs[CT_DPIF_TP_ATTR_TCP_TIME_WAIT];
-        VLOG_WARN("set tcp fin wait");
         return true;
     }
     return false;
 }
 
 static bool
-tp_has_tcp_closed(struct timeout_policy *tp, uint32_t *v) /* tcp close */
+tp_has_tcp_closed(struct timeout_policy *tp, uint32_t *v)
 {
-    if (!tp) {
-        return false;
-    }
-    if (tp->p.present & (1 << CT_DPIF_TP_ATTR_TCP_CLOSE)) {
+    if (tp && (tp->p.present & (1 << CT_DPIF_TP_ATTR_TCP_CLOSE))) {
         *v = tp->p.attrs[CT_DPIF_TP_ATTR_TCP_CLOSE];
-        VLOG_WARN("set tcp close");
         return true;
     }
     return false;
@@ -371,7 +331,6 @@ void
 other_conn_update_expiration(struct conntrack *ct, struct conn *conn,
                              enum ct_timeout tm, long long now)
 {
-    VLOG_INFO("Other update");
+    VLOG_INFO("Update %s", ct_timeout_str[tm]);
     conn_update_expiration_with_policy(ct, conn, tm, now);
 }
-
