@@ -148,42 +148,10 @@ conn_update_expiration_with_policy(struct conntrack *ct, struct conn *conn,
     uint32_t val;
 
     tp = timeout_policy_lookup(ct, conn->tpid);
-    if (tp) {
-        VLOG_INFO("%s tpid = %d tm=%d", __func__, tp->p.id, tm);
+    if (!tp) {
+        goto use_default;
     }
     switch (tm) {
-    case CT_TM_OTHER_FIRST:
-        if (tp_has_udp_first(tp, &val)) {
-            conn_update_expiration(ct, conn, tm, now, val, false);
-            return;
-        }
-        break;
-    case CT_TM_OTHER_BIDIR:
-        if (tp_has_udp_single(tp, &val)) {
-            conn_update_expiration(ct, conn, tm, now, val, false);
-            return;
-        }
-        break;
-    case CT_TM_OTHER_MULTIPLE:
-        if (tp_has_udp_multiple(tp, &val)) {
-            conn_update_expiration(ct, conn, tm, now, val, false);
-            return;
-        }
-        break;
-    case CT_TM_ICMP_FIRST: //9
-        if (tp_has_icmp_first(tp, &val)) {
-            conn_update_expiration(ct, conn, tm, now, val, false);
-            VLOG_INFO("now %llu exp %llu", now, conn->expiration);
-            return;
-        }
-        break;
-    case CT_TM_ICMP_REPLY:
-        return;
-        if (tp_has_icmp_reply(tp, &val)) {
-            conn_update_expiration(ct, conn, tm, now, val, false);
-            return;
-        }
-        break;
     case CT_TM_TCP_FIRST_PACKET:
         if (tp_has_tcp_syn_sent(tp, &val)) {
             conn_update_expiration(ct, conn, tm, now, val, false);
@@ -220,12 +188,43 @@ conn_update_expiration_with_policy(struct conntrack *ct, struct conn *conn,
             return;
         }
         break;
+    case CT_TM_OTHER_FIRST:
+        if (tp_has_udp_first(tp, &val)) {
+            conn_update_expiration(ct, conn, tm, now, val, false);
+            return;
+        }
+        break;
+    case CT_TM_OTHER_BIDIR:
+        if (tp_has_udp_single(tp, &val)) {
+            conn_update_expiration(ct, conn, tm, now, val, false);
+            return;
+        }
+        break;
+    case CT_TM_OTHER_MULTIPLE:
+        if (tp_has_udp_multiple(tp, &val)) {
+            conn_update_expiration(ct, conn, tm, now, val, false);
+            return;
+        }
+        break;
+    case CT_TM_ICMP_FIRST:
+        if (tp_has_icmp_first(tp, &val)) {
+            conn_update_expiration(ct, conn, tm, now, val, false);
+            return;
+        }
+        break;
+    case CT_TM_ICMP_REPLY:
+        return; //FIXME
+        if (tp_has_icmp_reply(tp, &val)) {
+            conn_update_expiration(ct, conn, tm, now, val, false);
+            return;
+        }
+        break;
     case N_CT_TM:
     default:
-        VLOG_WARN("%s case not handled", __func__);
+        OVS_NOT_REACHED();
         break;
     }
-    VLOG_INFO("use default for tm %d", tm);
+use_default:
     conn_update_expiration(ct, conn, tm, now, 0, true);
 }
 
@@ -237,10 +236,46 @@ conn_init_expiration_with_policy(struct conntrack *ct, struct conn *conn,
     uint32_t val;
 
     tp = timeout_policy_lookup(ct, conn->tpid);
-    if (tp) {
-        VLOG_INFO("%s tpid = %d tm=%d", __func__, tp->p.id, tm);
+    if (!tp) {
+        goto use_default;
     }
     switch (tm) {
+    case CT_TM_TCP_FIRST_PACKET:
+        if (tp_has_tcp_syn_sent(tp, &val)) {
+            conn_init_expiration(ct, conn, tm, now, val, false);
+            return;
+        }
+        break;
+    case CT_TM_TCP_OPENING:
+        if (tp_has_tcp_syn_recv(tp, &val)) {
+            conn_init_expiration(ct, conn, tm, now, val, false);
+            return;
+        }
+        break;
+    case CT_TM_TCP_ESTABLISHED:
+        if (tp_has_tcp_established(tp, &val)) {
+            conn_init_expiration(ct, conn, tm, now, val, false);
+            return;
+        }
+        break;
+    case CT_TM_TCP_CLOSING:
+        if (tp_has_tcp_fin_wait(tp, &val)) {
+            conn_init_expiration(ct, conn, tm, now, val, false);
+            return;
+        }
+        break;
+    case CT_TM_TCP_FIN_WAIT:
+        if (tp_has_tcp_time_wait(tp, &val)) {
+            conn_init_expiration(ct, conn, tm, now, val, false);
+            return;
+        }
+        break;
+    case CT_TM_TCP_CLOSED:
+        if (tp_has_tcp_closed(tp, &val)) {
+            conn_init_expiration(ct, conn, tm, now, val, false);
+            return;
+        }
+        break;
     case CT_TM_OTHER_FIRST:
         if (tp_has_udp_first(tp, &val)) {
             conn_init_expiration(ct, conn, tm, now, val, false);
@@ -266,24 +301,18 @@ conn_init_expiration_with_policy(struct conntrack *ct, struct conn *conn,
         }
         break;
     case CT_TM_ICMP_REPLY:
-        return;
+        return; //FIXME
         if (tp_has_icmp_reply(tp, &val)) {
             conn_init_expiration(ct, conn, tm, now, val, false);
             return;
         }
         break;
-    case CT_TM_TCP_FIRST_PACKET:
-    case CT_TM_TCP_OPENING:
-    case CT_TM_TCP_ESTABLISHED:
-    case CT_TM_TCP_CLOSING:
-    case CT_TM_TCP_FIN_WAIT:
-    case CT_TM_TCP_CLOSED:
     case N_CT_TM:
     default:
-        VLOG_WARN("%s case not handled", __func__);
+        OVS_NOT_REACHED();
         break;
     }
-
+use_default:
     conn_init_expiration(ct, conn, tm, now, 0, true);
 }
 
@@ -291,6 +320,7 @@ void
 conn_init_expiration_with_tp(struct conntrack *ct, struct conn *conn,
                              enum ct_timeout tm, long long now)
 {
+    VLOG_DBG("Init timeout policy: %s", ct_timeout_str[tm]);
     conn_init_expiration_with_policy(ct, conn, tm, now);
 }
 
@@ -298,5 +328,6 @@ void
 conn_update_expiration_with_tp(struct conntrack *ct, struct conn *conn,
                                enum ct_timeout tm, long long now)
 {
+    VLOG_DBG("Update timeout policy: %s", ct_timeout_str[tm]);
     conn_update_expiration_with_policy(ct, conn, tm, now);
 }
