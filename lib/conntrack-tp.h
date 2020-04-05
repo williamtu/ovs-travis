@@ -1,4 +1,3 @@
-
 /*
  * Copyright (c) 2020 VMware, Inc.
  *
@@ -21,5 +20,5 @@
 void conn_init_expiration_with_tp(struct conntrack *ct, struct conn *conn,
                                   enum ct_timeout tm, long long now);
 void conn_update_expiration_with_tp(struct conntrack *ct, struct conn *conn,
-                                  enum ct_timeout tm, long long now);
+                                    enum ct_timeout tm, long long now);
 #endif
