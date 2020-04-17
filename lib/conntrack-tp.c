@@ -70,7 +70,7 @@ timeout_policy_lookup(struct conntrack *ct, int32_t tp_id)
 
     hash = hash_int(tp_id, ct->hash_basis);
     HMAP_FOR_EACH_IN_BUCKET (tp, node, hash, &ct->timeout_policies) {
-        if (tp->p.id == tp_id) {
+        if (tp->policy.id == tp_id) {
             return tp;
         }
     }
@@ -84,8 +84,8 @@ update_existing_tp(struct timeout_policy *tp_dst,
     struct ct_dpif_timeout_policy *dst, *src;
     int i;
 
-    dst = &tp_dst->p;
-    src = &tp_src->p;
+    dst = &tp_dst->policy;
+    src = &tp_src->policy;
 
     /* Set the value and present bit to dst if present
      * bit in src is set.
@@ -99,11 +99,12 @@ update_existing_tp(struct timeout_policy *tp_dst,
 }
 
 static void
-set_default_tp(struct timeout_policy *tp)
+init_default_tp(struct timeout_policy *tp, uint32_t tp_id)
 {
-    tp->p.id = DEFAULT_TP_ID;
-    tp->p.present = 0;
-    memcpy(tp->p.attrs, ct_dpif_timeout_value_def, sizeof tp->p.attrs);  
+    tp->policy.id = tp_id;
+    tp->policy.present = 0;
+    memcpy(tp->policy.attrs, ct_dpif_timeout_value_def,
+           sizeof tp->policy.attrs);
 }
 
 int
@@ -111,12 +112,12 @@ timeout_policy_create(struct conntrack *ct,
                       struct timeout_policy *new_tp)
     OVS_REQUIRES(ct->ct_lock)
 {
-    uint32_t tp_id = new_tp->p.id;
+    uint32_t tp_id = new_tp->policy.id;
     struct timeout_policy *tp;
     uint32_t hash;
 
     tp = xzalloc(sizeof *tp);
-    set_default_tp(tp);
+    init_default_tp(tp, tp_id);
     update_existing_tp(tp, new_tp);
     hash = hash_int(tp_id, ct->hash_basis);
     hmap_insert(&ct->timeout_policies, &tp->node, hash);
@@ -128,7 +129,7 @@ int
 timeout_policy_update(struct conntrack *ct, struct timeout_policy *new_tp)
 {
     int err = 0;
-    uint32_t tp_id = new_tp->p.id;
+    uint32_t tp_id = new_tp->policy.id;
 
     ovs_mutex_lock(&ct->ct_lock);
     struct timeout_policy *tp = timeout_policy_lookup(ct, tp_id);
@@ -260,7 +261,7 @@ conn_update_expiration(struct conntrack *ct, struct conn *conn,
 
     tp = timeout_policy_lookup(ct, conn->tp_id);
     if (tp) {
-        val = tp->p.attrs[tm_to_ct_dpif_tp(tm)];
+        val = tp->policy.attrs[tm_to_ct_dpif_tp(tm)];
         VLOG_INFO_RL(&rl, "Update timeout %s with val %u.",
                      ct_timeout_str[tm], val);
     } else {
@@ -289,7 +290,7 @@ conn_init_expiration(struct conntrack *ct, struct conn *conn,
 
     tp = timeout_policy_lookup(ct, conn->tp_id);
     if (tp) {
-        val = tp->p.attrs[tm_to_ct_dpif_tp(tm)];
+        val = tp->policy.attrs[tm_to_ct_dpif_tp(tm)];
         VLOG_INFO_RL(&rl, "Init timeout %s with val %u sec.",
                     ct_timeout_str[tm], val);
     } else {

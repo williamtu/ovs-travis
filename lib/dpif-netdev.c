@@ -7702,12 +7702,10 @@ dpif_netdev_ct_set_timeout_policy(struct dpif *dpif,
 {
     struct timeout_policy tp;
     struct dp_netdev *dp;
-    int err = 0;
 
     dp = get_dp_netdev(dpif);
-    memcpy(&tp.p, dpif_tp, sizeof tp.p);
-    err = timeout_policy_update(dp->conntrack, &tp);
-    return err;
+    memcpy(&tp.policy, dpif_tp, sizeof tp.policy);
+    return timeout_policy_update(dp->conntrack, &tp);
 }
 
 static int
@@ -7723,7 +7721,7 @@ dpif_netdev_ct_get_timeout_policy(struct dpif *dpif, uint32_t tp_id,
     if (!tp) {
         return EINVAL;
     }
-    memcpy(dpif_tp, &tp->p, sizeof tp->p);
+    memcpy(dpif_tp, &tp->policy, sizeof tp->policy);
     return err;
 }
 

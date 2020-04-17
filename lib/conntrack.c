@@ -1528,7 +1528,7 @@ conntrack_clean(struct conntrack *ct, long long now)
     atomic_read_relaxed(&ct->n_conn_limit, &n_conn_limit);
     size_t clean_max = n_conn_limit > 10 ? n_conn_limit / 10 : 1;
     long long min_exp = ct_sweep(ct, now, clean_max);
-    long long next_wakeup = MIN(min_exp, now + CT_TM_MIN);
+    long long next_wakeup = MIN(min_exp, now + CT_DPIF_TP_MIN);
 
     return next_wakeup;
 }

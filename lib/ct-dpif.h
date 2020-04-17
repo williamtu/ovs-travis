@@ -225,6 +225,7 @@ struct ct_dpif_zone_limit {
     struct ovs_list node;
 };
 
+/* TP attr with default timeout in seconds. */
 #define CT_DPIF_TP_TCP_ATTRS \
     CT_DPIF_TP_TCP_ATTR(SYN_SENT, 30) \
     CT_DPIF_TP_TCP_ATTR(SYN_RECV, 30) \
@@ -246,6 +247,13 @@ struct ct_dpif_zone_limit {
 #define CT_DPIF_TP_ICMP_ATTRS \
     CT_DPIF_TP_ICMP_ATTR(FIRST, 60) \
     CT_DPIF_TP_ICMP_ATTR(REPLY, 30)
+
+/* The minimum value of the default timeout. */
+#define CT_DPIF_TP_MIN 30
+#define CT_DPIF_TP_TCP_ATTR(ATTR, VAL) \
+            BUILD_ASSERT_DECL(VAL >= CT_DPIF_TP_MIN);
+    CT_DPIF_TP_TCP_ATTRS
+#undef CT_DPIF_TP_TCP_ATTR
 
 enum OVS_PACKED_ENUM ct_dpif_tp_attr {
 #define CT_DPIF_TP_TCP_ATTR(ATTR, VAL) CT_DPIF_TP_ATTR_TCP_##ATTR,

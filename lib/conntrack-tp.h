@@ -22,10 +22,10 @@ void timeout_policy_init(struct conntrack *ct);
 int timeout_policy_create(struct conntrack *ct, struct timeout_policy *tp);
 void timeout_policy_clean(struct conntrack *ct, struct timeout_policy *tp);
 int timeout_policy_update(struct conntrack *ct, struct timeout_policy *tp);
-int timeout_policy_delete(struct conntrack *ct, uint32_t tpid);
-struct timeout_policy *timeout_policy_get(struct conntrack *ct, int32_t tpid);
+int timeout_policy_delete(struct conntrack *ct, uint32_t tp_id);
+struct timeout_policy *timeout_policy_get(struct conntrack *ct, int32_t tp_id);
 struct timeout_policy *timeout_policy_lookup(struct conntrack *ct,
-                                             int32_t tpid);
+                                             int32_t tp_id);
 void conn_init_expiration(struct conntrack *ct, struct conn *conn,
                           enum ct_timeout tm, long long now);
 void conn_update_expiration(struct conntrack *ct, struct conn *conn,
