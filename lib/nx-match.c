@@ -966,6 +966,9 @@ nxm_put_ip(struct nxm_put_ctx *ctx,
     nxm_put_32m(ctx, MFF_IPV6_LABEL, oxm,
                 flow->ipv6_label, match->wc.masks.ipv6_label);
 
+    nxm_put_16m(ctx, MFF_IPV6_EXTHDR, oxm,
+                flow->ipv6_exthdr, match->wc.masks.ipv6_exthdr);
+
     if (match->wc.masks.nw_proto) {
         nxm_put_8(ctx, MFF_IP_PROTO, oxm, flow->nw_proto);
 
@@ -1051,7 +1054,7 @@ nx_put_raw(struct ofpbuf *b, enum ofp_version oxm, const struct match *match,
     ovs_be32 spi_mask;
     int match_len;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 42);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 43);
 
     struct nxm_put_ctx ctx = { .output = b, .implied_ethernet = false };
 

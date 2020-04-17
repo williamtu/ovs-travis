@@ -9534,7 +9534,7 @@ OVS_APP_EXIT_AND_WAIT([ovs-ofctl])
 
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 NXT_PACKET_IN (xid=0x0): cookie=0x0 total_len=86 in_port=1 (via no_match) data_len=86 (unbuffered)
-icmp6,vlan_tci=0x0000,dl_src=00:00:86:05:80:da,dl_dst=00:60:97:07:69:ea,ipv6_src=fe80::200:86ff:fe05:80da,ipv6_dst=fe80::260:97ff:fe07:69ea,ipv6_label=0x00000,nw_tos=0,nw_ecn=0,nw_ttl=255,icmp_type=135,icmp_code=0,nd_target=fe80::260:97ff:fe07:69ea,nd_sll=00:00:86:05:80:da,nd_tll=00:00:00:00:00:00 icmp6_csum:68bd
+icmp6,vlan_tci=0x0000,dl_src=00:00:86:05:80:da,dl_dst=00:60:97:07:69:ea,ipv6_src=fe80::200:86ff:fe05:80da,ipv6_dst=fe80::260:97ff:fe07:69ea,ipv6_label=0x00000,ipv6_ext=0,nw_tos=0,nw_ecn=0,nw_ttl=255,icmp_type=135,icmp_code=0,nd_target=fe80::260:97ff:fe07:69ea,nd_sll=00:00:86:05:80:da,nd_tll=00:00:00:00:00:00 icmp6_csum:68bd
 ])
 
 OVS_VSWITCHD_STOP
@@ -9585,7 +9585,7 @@ OVS_APP_EXIT_AND_WAIT([ovs-ofctl])
 
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 NXT_PACKET_IN (xid=0x0): cookie=0x0 total_len=86 in_port=1 (via action) data_len=86 (unbuffered)
-icmp6,vlan_tci=0x0000,dl_src=00:00:86:05:80:da,dl_dst=00:60:97:07:69:ea,ipv6_src=fe80::200:86ff:fe05:80da,ipv6_dst=fe80::260:97ff:fe07:69ea,ipv6_label=0x00000,nw_tos=0,nw_ecn=0,nw_ttl=255,icmp_type=135,icmp_code=0,nd_target=fe80::1,nd_sll=32:21:14:86:11:74,nd_tll=00:00:00:00:00:00 icmp6_csum:19d3
+icmp6,vlan_tci=0x0000,dl_src=00:00:86:05:80:da,dl_dst=00:60:97:07:69:ea,ipv6_src=fe80::200:86ff:fe05:80da,ipv6_dst=fe80::260:97ff:fe07:69ea,ipv6_label=0x00000,ipv6_ext=0,nw_tos=0,nw_ecn=0,nw_ttl=255,icmp_type=135,icmp_code=0,nd_target=fe80::1,nd_sll=32:21:14:86:11:74,nd_tll=00:00:00:00:00:00 icmp6_csum:19d3
 ])
 
 OVS_VSWITCHD_STOP
@@ -9999,9 +9999,9 @@ dnl Note that the first packet doesn't have the ct_state bits set. This
 dnl happens because the ct_state field is available only after recirc.
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 NXT_PACKET_IN (xid=0x0): cookie=0x0 total_len=126 in_port=1 (via action) data_len=126 (unbuffered)
-udp6,vlan_tci=0x0000,dl_src=50:54:00:00:00:09,dl_dst=50:54:00:00:00:0a,ipv6_src=2001:db8::1,ipv6_dst=2001:db8::2,ipv6_label=0x00000,nw_tos=112,nw_ecn=0,nw_ttl=128,tp_src=1,tp_dst=2 udp_csum:bfe2
+udp6,vlan_tci=0x0000,dl_src=50:54:00:00:00:09,dl_dst=50:54:00:00:00:0a,ipv6_src=2001:db8::1,ipv6_dst=2001:db8::2,ipv6_label=0x00000,ipv6_ext=0,nw_tos=112,nw_ecn=0,nw_ttl=128,tp_src=1,tp_dst=2 udp_csum:bfe2
 NXT_PACKET_IN (xid=0x0): table_id=1 cookie=0x0 total_len=126 ct_state=est|rpl|trk,ct_ipv6_src=2001:db8::1,ct_ipv6_dst=2001:db8::2,ct_nw_proto=17,ct_tp_src=1,ct_tp_dst=2,ipv6,in_port=2 (via action) data_len=126 (unbuffered)
-udp6,vlan_tci=0x0000,dl_src=50:54:00:00:00:0a,dl_dst=50:54:00:00:00:09,ipv6_src=2001:db8::2,ipv6_dst=2001:db8::1,ipv6_label=0x00000,nw_tos=112,nw_ecn=0,nw_ttl=128,tp_src=2,tp_dst=1 udp_csum:bfe2
+udp6,vlan_tci=0x0000,dl_src=50:54:00:00:00:0a,dl_dst=50:54:00:00:00:09,ipv6_src=2001:db8::2,ipv6_dst=2001:db8::1,ipv6_label=0x00000,ipv6_ext=0,nw_tos=112,nw_ecn=0,nw_ttl=128,tp_src=2,tp_dst=1 udp_csum:bfe2
 ])
 
 OVS_VSWITCHD_STOP
@@ -10146,7 +10146,7 @@ OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 NXT_PACKET_IN (xid=0x0): cookie=0x0 total_len=86 ct_state=inv|trk,ipv6,in_port=2 (via action) data_len=86 (unbuffered)
-icmp6,vlan_tci=0x0000,dl_src=00:00:86:05:80:da,dl_dst=00:60:97:07:69:ea,ipv6_src=fe80::200:86ff:fe05:80da,ipv6_dst=fe80::260:97ff:fe07:69ea,ipv6_label=0x00000,nw_tos=0,nw_ecn=0,nw_ttl=255,icmp_type=135,icmp_code=0,nd_target=fe80::260:97ff:fe07:69ea,nd_sll=00:00:86:05:80:da,nd_tll=00:00:00:00:00:00 icmp6_csum:68bd
+icmp6,vlan_tci=0x0000,dl_src=00:00:86:05:80:da,dl_dst=00:60:97:07:69:ea,ipv6_src=fe80::200:86ff:fe05:80da,ipv6_dst=fe80::260:97ff:fe07:69ea,ipv6_label=0x00000,ipv6_ext=0,nw_tos=0,nw_ecn=0,nw_ttl=255,icmp_type=135,icmp_code=0,nd_target=fe80::260:97ff:fe07:69ea,nd_sll=00:00:86:05:80:da,nd_tll=00:00:00:00:00:00 icmp6_csum:68bd
 ])
 
 OVS_VSWITCHD_STOP
@@ -10892,7 +10892,7 @@ NXT_PACKET_IN (xid=0x0): table_id=1 cookie=0x0 total_len=106 ct_state=est|rpl|tr
 udp,vlan_tci=0x0000,dl_src=50:54:00:00:00:0a,dl_dst=50:54:00:00:00:09,nw_src=10.1.2.200,nw_dst=10.1.2.100,nw_tos=0,nw_ecn=0,nw_ttl=64,tp_src=6,tp_dst=6 udp_csum:221
 dnl
 NXT_PACKET_IN (xid=0x0): table_id=1 cookie=0x0 total_len=126 ct_state=est|rpl|trk,ct_ipv6_src=2001:db8::1,ct_ipv6_dst=2001:db8::2,ct_nw_proto=17,ct_tp_src=1,ct_tp_dst=2,ipv6,in_port=2 (via action) data_len=126 (unbuffered)
-udp6,vlan_tci=0x0000,dl_src=50:54:00:00:00:0a,dl_dst=50:54:00:00:00:09,ipv6_src=2001:db8::2,ipv6_dst=2001:db8::1,ipv6_label=0x00000,nw_tos=112,nw_ecn=0,nw_ttl=128,tp_src=2,tp_dst=1 udp_csum:bfe2
+udp6,vlan_tci=0x0000,dl_src=50:54:00:00:00:0a,dl_dst=50:54:00:00:00:09,ipv6_src=2001:db8::2,ipv6_dst=2001:db8::1,ipv6_label=0x00000,ipv6_ext=0,nw_tos=112,nw_ecn=0,nw_ttl=128,tp_src=2,tp_dst=1 udp_csum:bfe2
 dnl
 NXT_PACKET_IN (xid=0x0): table_id=1 cookie=0x0 total_len=106 ct_state=est|rpl|trk,ct_nw_src=10.1.1.1,ct_nw_dst=10.1.1.2,ct_nw_proto=17,ct_tp_src=1,ct_tp_dst=2,ip,in_port=2 (via action) data_len=106 (unbuffered)
 udp,vlan_tci=0x0000,dl_src=50:54:00:00:00:0a,dl_dst=50:54:00:00:00:09,nw_src=10.1.1.2,nw_dst=10.1.1.1,nw_tos=0,nw_ecn=0,nw_ttl=64,tp_src=2,tp_dst=1 udp_csum:553
