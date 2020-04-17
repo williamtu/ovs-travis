@@ -25,6 +25,7 @@
 #include "bitmap.h"
 #include "conntrack.h"
 #include "conntrack-private.h"
+#include "conntrack-tp.h"
 #include "coverage.h"
 #include "csum.h"
 #include "ct-dpif.h"
@@ -175,12 +176,6 @@ static alg_helper alg_helpers[] = {
     [CT_ALG_CTL_TFTP] = handle_tftp_ctl,
 };
 
-long long ct_timeout_val[] = {
-#define CT_TIMEOUT(NAME, VAL) [CT_TM_##NAME] = VAL,
-    CT_TIMEOUTS
-#undef CT_TIMEOUT
-};
-
 /* The maximum TCP or UDP port number. */
 #define CT_MAX_L4_PORT 65535
 /* String buffer used for parsing FTP string messages.
@@ -312,6 +307,7 @@ conntrack_init(void)
     }
     hmap_init(&ct->zone_limits);
     ct->zone_limit_seq = 0;
+    timeout_policy_init(ct);
     ovs_mutex_unlock(&ct->ct_lock);
 
     ct->hash_basis = random_uint32();
@@ -501,6 +497,12 @@ conntrack_destroy(struct conntrack *ct)
         free(zl);
     }
     hmap_destroy(&ct->zone_limits);
+
+    struct timeout_policy *tp;
+    HMAP_FOR_EACH_POP (tp, node, &ct->timeout_policies) {
+        free(tp);
+    }
+    hmap_destroy(&ct->timeout_policies);
 
     ovs_mutex_unlock(&ct->ct_lock);
     ovs_mutex_destroy(&ct->ct_lock);
@@ -1275,7 +1277,8 @@ process_one(struct conntrack *ct, struct dp_packet *pkt,
             bool force, bool commit, long long now, const uint32_t *setmark,
             const struct ovs_key_ct_labels *setlabel,
             const struct nat_action_info_t *nat_action_info,
-            ovs_be16 tp_src, ovs_be16 tp_dst, const char *helper)
+            ovs_be16 tp_src, ovs_be16 tp_dst, const char *helper,
+            uint32_t tp_id)
 {
     /* Reset ct_state whenever entering a new zone. */
     if (pkt->md.ct_state && pkt->md.ct_zone != zone) {
@@ -1323,6 +1326,7 @@ process_one(struct conntrack *ct, struct dp_packet *pkt,
                                               nat_action_info,
                                               ct_alg_ctl, now,
                                               &create_new_conn))) {
+            conn->tp_id = tp_id;
             create_new_conn = conn_update_state(ct, pkt, ctx, conn, now);
         }
         if (nat_action_info && !create_new_conn) {
@@ -1395,7 +1399,7 @@ conntrack_execute(struct conntrack *ct, struct dp_packet_batch *pkt_batch,
                   const struct ovs_key_ct_labels *setlabel,
                   ovs_be16 tp_src, ovs_be16 tp_dst, const char *helper,
                   const struct nat_action_info_t *nat_action_info,
-                  long long now)
+                  long long now, uint32_t tp_id)
 {
     ipf_preprocess_conntrack(ct->ipf, pkt_batch, now, dl_type, zone,
                              ct->hash_basis);
@@ -1417,7 +1421,8 @@ conntrack_execute(struct conntrack *ct, struct dp_packet_batch *pkt_batch,
             write_ct_md(packet, zone, NULL, NULL, NULL);
         } else {
             process_one(ct, packet, &ctx, zone, force, commit, now, setmark,
-                        setlabel, nat_action_info, tp_src, tp_dst, helper);
+                        setlabel, nat_action_info, tp_src, tp_dst, helper,
+                        tp_id);
         }
     }
 
@@ -1547,7 +1552,7 @@ conntrack_clean(struct conntrack *ct, long long now)
  *   behind, there is at least some 200ms blocks of time when the map will be
  *   left alone, so the datapath can operate unhindered.
  */
-#define CT_CLEAN_INTERVAL 5000 /* 5 seconds */
+#define CT_CLEAN_INTERVAL 5000 /* 5 second */
 #define CT_CLEAN_MIN_INTERVAL 200  /* 0.2 seconds */
 
 static void *

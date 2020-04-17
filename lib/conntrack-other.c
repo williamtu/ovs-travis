@@ -17,6 +17,7 @@
 #include <config.h>
 
 #include "conntrack-private.h"
+#include "conntrack-tp.h"
 #include "dp-packet.h"
 
 enum OVS_PACKED_ENUM other_state {

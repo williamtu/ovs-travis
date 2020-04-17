@@ -22,7 +22,11 @@
 #include <netinet/icmp6.h>
 
 #include "conntrack-private.h"
+#include "conntrack-tp.h"
 #include "dp-packet.h"
+
+#include "openvswitch/vlog.h"
+VLOG_DEFINE_THIS_MODULE(conntrack_icmp);
 
 enum OVS_PACKED_ENUM icmp_state {
     ICMPS_FIRST,
@@ -50,9 +54,13 @@ icmp_conn_update(struct conntrack *ct, struct conn *conn_,
                  struct dp_packet *pkt OVS_UNUSED, bool reply, long long now)
 {
     struct conn_icmp *conn = conn_icmp_cast(conn_);
-    conn->state = reply ? ICMPS_REPLY : ICMPS_FIRST;
-    conn_update_expiration(ct, &conn->up, icmp_timeouts[conn->state], now);
 
+    if (reply && conn->state == ICMPS_FIRST) {
+        conn->state = ICMPS_REPLY;
+    }
+
+    //conn->state = reply ? ICMPS_REPLY : ICMPS_FIRST;
+    conn_update_expiration(ct, &conn->up, icmp_timeouts[conn->state], now);
     return CT_UPDATE_VALID;
 }
 
@@ -81,7 +89,6 @@ icmp_new_conn(struct conntrack *ct, struct dp_packet *pkt OVS_UNUSED,
     struct conn_icmp *conn = xzalloc(sizeof *conn);
     conn->state = ICMPS_FIRST;
     conn_init_expiration(ct, &conn->up, icmp_timeouts[conn->state], now);
-
     return &conn->up;
 }
 

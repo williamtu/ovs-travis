@@ -39,6 +39,7 @@
 #include <config.h>
 
 #include "conntrack-private.h"
+#include "conntrack-tp.h"
 #include "coverage.h"
 #include "ct-dpif.h"
 #include "dp-packet.h"
@@ -188,7 +189,8 @@ tcp_conn_update(struct conntrack *ct, struct conn *conn_,
             return CT_UPDATE_NEW;
         } else if (src->state <= CT_DPIF_TCPS_SYN_SENT) {
             src->state = CT_DPIF_TCPS_SYN_SENT;
-            conn_update_expiration(ct, &conn->up, CT_TM_TCP_FIRST_PACKET, now);
+            conn_update_expiration(ct, &conn->up,
+                                   CT_TM_TCP_FIRST_PACKET, now);
             return CT_UPDATE_VALID_NEW;
         }
     }
@@ -350,7 +352,8 @@ tcp_conn_update(struct conntrack *ct, struct conn *conn_,
                    || dst->state >= CT_DPIF_TCPS_CLOSING) {
             conn_update_expiration(ct, &conn->up, CT_TM_TCP_CLOSING, now);
         } else {
-            conn_update_expiration(ct, &conn->up, CT_TM_TCP_ESTABLISHED, now);
+            conn_update_expiration(ct, &conn->up, CT_TM_TCP_ESTABLISHED,
+                                   now);
         }
     } else if ((dst->state < CT_DPIF_TCPS_SYN_SENT
                 || dst->state >= CT_DPIF_TCPS_FIN_WAIT_2
