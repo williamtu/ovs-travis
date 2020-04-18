@@ -7338,7 +7338,7 @@ dp_execute_cb(void *aux_, struct dp_packet_batch *packets_,
         bool commit = false;
         unsigned int left;
         uint16_t zone = 0;
-        uint32_t tp_id = 0;
+        uint32_t tp_id = 0xff;
         const char *helper = NULL;
         const uint32_t *setmark = NULL;
         const struct ovs_key_ct_labels *setlabel = NULL;
@@ -7374,9 +7374,11 @@ dp_execute_cb(void *aux_, struct dp_packet_batch *packets_,
                  * netlink events. */
                 break;
             case OVS_CT_ATTR_TIMEOUT:
+                VLOG_INFO("%s tp_id %s", __func__, nl_attr_get_string(b));
                 if (!str_to_uint(nl_attr_get_string(b), 10, &tp_id)) {
                     VLOG_WARN("Invalid Timeout Policy ID %s.",
                               nl_attr_get_string(b));
+                    tp_id = DEFAULT_TP_ID;
                 }
                 break;
             case OVS_CT_ATTR_NAT: {
@@ -7705,6 +7707,7 @@ dpif_netdev_ct_set_timeout_policy(struct dpif *dpif,
 
     dp = get_dp_netdev(dpif);
     memcpy(&tp.policy, dpif_tp, sizeof tp.policy);
+    VLOG_INFO("%s id %u", __func__, tp.policy.id);
     return timeout_policy_update(dp->conntrack, &tp);
 }
 
@@ -7722,6 +7725,8 @@ dpif_netdev_ct_get_timeout_policy(struct dpif *dpif, uint32_t tp_id,
         return EINVAL;
     }
     memcpy(dpif_tp, &tp->policy, sizeof tp->policy);
+
+    VLOG_INFO("%s %u", __func__, dpif_tp->id);
     return err;
 }
 
@@ -7732,6 +7737,7 @@ dpif_netdev_ct_del_timeout_policy(struct dpif *dpif,
     struct dp_netdev *dp;
     int err = 0;
 
+    VLOG_INFO("%s id %u", __func__, tp_id);
     dp = get_dp_netdev(dpif);
     err = timeout_policy_delete(dp->conntrack, tp_id);
     return err;

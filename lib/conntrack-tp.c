@@ -23,7 +23,7 @@
 
 #include "openvswitch/vlog.h"
 VLOG_DEFINE_THIS_MODULE(conntrack_tp);
-static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+//static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
 
 #define DEFAULT_TP_ID 0
 
@@ -31,6 +31,20 @@ static const char *ct_timeout_str[] = {
 #define CT_TIMEOUT(NAME, VALUE) #NAME,
     CT_TIMEOUTS
 #undef CT_TIMEOUT
+};
+
+static const char *dpif_ct_timeout_str[] = {
+#define xstr(s) #s
+#define CT_DPIF_TP_TCP_ATTR(NAME, VAL) xstr(TCP_##NAME),
+    CT_DPIF_TP_TCP_ATTRS
+#undef CT_DPIF_TP_TCP_ATTR
+#define CT_DPIF_TP_UDP_ATTR(NAME, VAL) xstr(UDP_##NAME),
+    CT_DPIF_TP_UDP_ATTRS
+#undef CT_DPIF_TP_UDP_ATTR
+#define CT_DPIF_TP_ICMP_ATTR(NAME, VAL) xstr(ICMP_##NAME),
+    CT_DPIF_TP_ICMP_ATTRS
+#undef CT_DPIF_TP_ICMP_ATTR
+#undef xstr
 };
 
 static unsigned int ct_dpif_timeout_value_def[] = {
@@ -44,6 +58,22 @@ static unsigned int ct_dpif_timeout_value_def[] = {
     CT_DPIF_TP_ICMP_ATTRS
 #undef CT_DPIF_TP_ICMP_ATTR
 };
+
+static void
+timeout_policy_dump(struct timeout_policy *tp)
+{
+    bool present;
+    int i;
+
+    VLOG_INFO("Timeout Policy ID %u:", tp->policy.id);
+    for (i = 0; i < ARRAY_SIZE(tp->policy.attrs); i++) {
+        if (tp->policy.present & (1 << i)) {
+            present = !!(tp->policy.present & (1 << i));
+            VLOG_INFO("  Policy: %s present: %u value: %u",
+                      dpif_ct_timeout_str[i], present, tp->policy.attrs[i]);
+        }
+    }
+}
 
 struct timeout_policy *
 timeout_policy_get(struct conntrack *ct, int32_t tp_id)
@@ -71,6 +101,7 @@ timeout_policy_lookup(struct conntrack *ct, int32_t tp_id)
     hash = hash_int(tp_id, ct->hash_basis);
     HMAP_FOR_EACH_IN_BUCKET (tp, node, hash, &ct->timeout_policies) {
         if (tp->policy.id == tp_id) {
+            timeout_policy_dump(tp);
             return tp;
         }
     }
@@ -102,12 +133,15 @@ static void
 init_default_tp(struct timeout_policy *tp, uint32_t tp_id)
 {
     tp->policy.id = tp_id;
+    /* Initialize the timeout value to default, but not
+     * setting the present bit.
+     */
     tp->policy.present = 0;
     memcpy(tp->policy.attrs, ct_dpif_timeout_value_def,
            sizeof tp->policy.attrs);
 }
 
-int
+static void
 timeout_policy_create(struct conntrack *ct,
                       struct timeout_policy *new_tp)
     OVS_REQUIRES(ct->ct_lock)
@@ -121,8 +155,6 @@ timeout_policy_create(struct conntrack *ct,
     update_existing_tp(tp, new_tp);
     hash = hash_int(tp_id, ct->hash_basis);
     hmap_insert(&ct->timeout_policies, &tp->node, hash);
-
-    return 0;
 }
 
 int
@@ -137,12 +169,9 @@ timeout_policy_update(struct conntrack *ct, struct timeout_policy *new_tp)
         VLOG_INFO("Changed timeout policy of existing tp_id %d", tp_id);
         update_existing_tp(tp, new_tp);
     } else {
-        err = timeout_policy_create(ct, new_tp);
-        if (err) {
-            VLOG_WARN("Request to create timeout policy failed");
-        } else {
-            VLOG_INFO("Created timeout policy tp_id %d", tp_id);
-        }
+        VLOG_INFO("creating new tp id %u", tp_id);
+        timeout_policy_create(ct, new_tp);
+        timeout_policy_dump(new_tp);
     }
     ovs_mutex_unlock(&ct->ct_lock);
     return err;
@@ -175,7 +204,14 @@ timeout_policy_delete(struct conntrack *ct, uint32_t tp_id)
 void
 timeout_policy_init(struct conntrack *ct)
 {
+    struct timeout_policy tp;
+
     hmap_init(&ct->timeout_policies);
+
+    /* Create default timeout policy. */
+    memset(&tp, 0, sizeof tp);
+    tp.policy.id = DEFAULT_TP_ID;
+    timeout_policy_create(ct, &tp);
 }
 
 /*
@@ -259,14 +295,18 @@ conn_update_expiration(struct conntrack *ct, struct conn *conn,
     struct timeout_policy *tp;
     uint32_t val;
 
+    VLOG_INFO("update id %u", conn->tp_id);
     tp = timeout_policy_lookup(ct, conn->tp_id);
     if (tp) {
         val = tp->policy.attrs[tm_to_ct_dpif_tp(tm)];
-        VLOG_INFO_RL(&rl, "Update timeout %s with val %u.",
-                     ct_timeout_str[tm], val);
+
+        VLOG_INFO("Found Update timeout %s with val %u.",
+              ct_timeout_str[tm], val);
     } else {
-        VLOG_INFO("use default update");
         val = ct_dpif_timeout_value_def[tm_to_ct_dpif_tp(tm)];
+
+        VLOG_INFO("XXX not found Update timeout %s with val %u.",
+              ct_timeout_str[tm], val);
     }
     conn_update_expiration__(ct, conn, tm, now, val);
 }
@@ -288,14 +328,19 @@ conn_init_expiration(struct conntrack *ct, struct conn *conn,
     struct timeout_policy *tp;
     uint32_t val;
 
+    VLOG_INFO("init id %u conn %p", conn->tp_id, conn);
     tp = timeout_policy_lookup(ct, conn->tp_id);
     if (tp) {
         val = tp->policy.attrs[tm_to_ct_dpif_tp(tm)];
-        VLOG_INFO_RL(&rl, "Init timeout %s with val %u sec.",
-                    ct_timeout_str[tm], val);
+
+        VLOG_INFO("Found Init timeout %s with val %u sec.",
+              ct_timeout_str[tm], val);
     } else {
-        VLOG_INFO("use default init");
         val = ct_dpif_timeout_value_def[tm_to_ct_dpif_tp(tm)];
+        VLOG_INFO("XXX NOT Found Init timeout %s with val %u sec.",
+              ct_timeout_str[tm], val);
+
     }
+
     conn_init_expiration__(ct, conn, tm, now, val);
 }

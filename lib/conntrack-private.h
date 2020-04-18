@@ -200,7 +200,7 @@ extern struct ct_l4_proto ct_proto_icmp6;
 
 struct ct_l4_proto {
     struct conn *(*new_conn)(struct conntrack *ct, struct dp_packet *pkt,
-                             long long now);
+                             long long now, uint32_t tp_id);
     bool (*valid_new)(struct dp_packet *pkt);
     enum ct_update_res (*conn_update)(struct conntrack *ct, struct conn *conn,
                                       struct dp_packet *pkt, bool reply,

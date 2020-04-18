@@ -89,7 +89,8 @@ static uint32_t conn_key_hash(const struct conn_key *, uint32_t basis);
 static void conn_key_reverse(struct conn_key *);
 static bool valid_new(struct dp_packet *pkt, struct conn_key *);
 static struct conn *new_conn(struct conntrack *ct, struct dp_packet *pkt,
-                             struct conn_key *, long long now);
+                             struct conn_key *, long long now,
+                             uint32_t tp_id);
 static void delete_conn_cmn(struct conn *);
 static void delete_conn(struct conn *);
 static void delete_conn_one(struct conn *conn);
@@ -958,7 +959,7 @@ conn_not_found(struct conntrack *ct, struct dp_packet *pkt,
                struct conn_lookup_ctx *ctx, bool commit, long long now,
                const struct nat_action_info_t *nat_action_info,
                const char *helper, const struct alg_exp_node *alg_exp,
-               enum ct_alg_ctl_type ct_alg_ctl)
+               enum ct_alg_ctl_type ct_alg_ctl, uint32_t tp_id)
     OVS_REQUIRES(ct->ct_lock)
 {
     struct conn *nc = NULL;
@@ -989,7 +990,7 @@ conn_not_found(struct conntrack *ct, struct dp_packet *pkt,
             return nc;
         }
 
-        nc = new_conn(ct, pkt, &ctx->key, now);
+        nc = new_conn(ct, pkt, &ctx->key, now, tp_id);
         memcpy(&nc->key, &ctx->key, sizeof nc->key);
         memcpy(&nc->rev_key, &nc->key, sizeof nc->rev_key);
         conn_key_reverse(&nc->rev_key);
@@ -1285,10 +1286,12 @@ process_one(struct conntrack *ct, struct dp_packet *pkt,
         pkt->md.ct_state = 0;
     }
 
+
     bool create_new_conn = false;
     conn_key_lookup(ct, &ctx->key, ctx->hash, now, &ctx->conn, &ctx->reply);
     struct conn *conn = ctx->conn;
 
+VLOG_INFO("%s %u conn %p", __func__, tp_id, conn);
     /* Delete found entry if in wrong direction. 'force' implies commit. */
     if (OVS_UNLIKELY(force && ctx->reply && conn)) {
         ovs_mutex_lock(&ct->ct_lock);
@@ -1326,7 +1329,7 @@ process_one(struct conntrack *ct, struct dp_packet *pkt,
                                               nat_action_info,
                                               ct_alg_ctl, now,
                                               &create_new_conn))) {
-            conn->tp_id = tp_id;
+            //conn->tp_id = tp_id;
             create_new_conn = conn_update_state(ct, pkt, ctx, conn, now);
         }
         if (nat_action_info && !create_new_conn) {
@@ -1363,7 +1366,7 @@ process_one(struct conntrack *ct, struct dp_packet *pkt,
         ovs_mutex_lock(&ct->ct_lock);
         if (!conn_lookup(ct, &ctx->key, now, NULL, NULL)) {
             conn = conn_not_found(ct, pkt, ctx, commit, now, nat_action_info,
-                                  helper, alg_exp, ct_alg_ctl);
+                                  helper, alg_exp, ct_alg_ctl, tp_id);
         }
         ovs_mutex_unlock(&ct->ct_lock);
     }
@@ -1413,6 +1416,7 @@ conntrack_execute(struct conntrack *ct, struct dp_packet_batch *pkt_batch,
             write_ct_md(packet, zone, NULL, NULL, NULL);
         } else if (conn && conn->key.zone == zone && !force
                    && !get_alg_ctl_type(packet, tp_src, tp_dst, helper)) {
+            VLOG_INFO("process_one_fast");
             process_one_fast(zone, setmark, setlabel, nat_action_info,
                              conn, packet);
         } else if (OVS_UNLIKELY(!conn_key_extract(ct, packet, dl_type, &ctx,
@@ -1420,6 +1424,8 @@ conntrack_execute(struct conntrack *ct, struct dp_packet_batch *pkt_batch,
             packet->md.ct_state = CS_INVALID;
             write_ct_md(packet, zone, NULL, NULL, NULL);
         } else {
+
+            VLOG_INFO("%s %u conn %p", __func__, tp_id, conn);
             process_one(ct, packet, &ctx, zone, force, commit, now, setmark,
                         setlabel, nat_action_info, tp_src, tp_dst, helper,
                         tp_id);
@@ -1552,7 +1558,7 @@ conntrack_clean(struct conntrack *ct, long long now)
  *   behind, there is at least some 200ms blocks of time when the map will be
  *   left alone, so the datapath can operate unhindered.
  */
-#define CT_CLEAN_INTERVAL 5000 /* 5 second */
+#define CT_CLEAN_INTERVAL 1000 /* 5 second */
 #define CT_CLEAN_MIN_INTERVAL 200  /* 0.2 seconds */
 
 static void *
@@ -2352,9 +2358,9 @@ valid_new(struct dp_packet *pkt, struct conn_key *key)
 
 static struct conn *
 new_conn(struct conntrack *ct, struct dp_packet *pkt, struct conn_key *key,
-         long long now)
+         long long now, uint32_t tp_id)
 {
-    return l4_protos[key->nw_proto]->new_conn(ct, pkt, now);
+    return l4_protos[key->nw_proto]->new_conn(ct, pkt, now, tp_id);
 }
 
 static void

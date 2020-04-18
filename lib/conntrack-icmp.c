@@ -84,10 +84,12 @@ icmp6_valid_new(struct dp_packet *pkt)
 
 static struct conn *
 icmp_new_conn(struct conntrack *ct, struct dp_packet *pkt OVS_UNUSED,
-              long long now)
+              long long now, uint32_t tp_id)
 {
     struct conn_icmp *conn = xzalloc(sizeof *conn);
     conn->state = ICMPS_FIRST;
+    conn->up.tp_id = tp_id;
+
     conn_init_expiration(ct, &conn->up, icmp_timeouts[conn->state], now);
     return &conn->up;
 }

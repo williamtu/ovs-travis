@@ -19,7 +19,6 @@
 
 enum ct_timeout;
 void timeout_policy_init(struct conntrack *ct);
-int timeout_policy_create(struct conntrack *ct, struct timeout_policy *tp);
 void timeout_policy_clean(struct conntrack *ct, struct timeout_policy *tp);
 int timeout_policy_update(struct conntrack *ct, struct timeout_policy *tp);
 int timeout_policy_delete(struct conntrack *ct, uint32_t tp_id);
