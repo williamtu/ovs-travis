@@ -1261,6 +1261,53 @@ sorted_poll_thread_list(struct dp_netdev *dp,
 }
 
 static void
+dpif_netdev_subtable_lookup_set(struct unixctl_conn *conn, int argc,
+                                const char *argv[], void *aux OVS_UNUSED)
+{
+    /* This function requires 2 parameters (argv[1] and argv[2]) to execute.
+     *   argv[1] is subtable name
+     *   argv[2] is priority
+     *
+     * A 3rd parameter is optional to re-probe existing subtables, causing the
+     * new subtable lookup function priority to immidiately take effect.
+     *   argv[3] is "-reprobe" or "-r"
+     */
+    const char *func_name = argv[1];
+
+    errno = 0;
+    char *err_char;
+    uint32_t new_prio = strtoul(argv[2], &err_char, 10);
+    if (errno != 0 || new_prio > UINT8_MAX) {
+        unixctl_command_reply_error(conn,
+            "error converting priority, use integer in range 0-255\n");
+        return;
+    }
+
+    int32_t err = dpcls_subtable_set_prio(func_name, new_prio);
+    if (err) {
+        unixctl_command_reply_error(conn,
+            "error, subtable lookup function not found\n");
+        return;
+    }
+
+    /* argv[3] is optional reprobe flag "-reprobe" or "-r" */
+    if (argc == 4) {
+        if (strcmp(argv[3], "-reprobe") == 0 ||
+                strcmp(argv[3], "-r") == 0) {
+            printf("reprobe triggered\n");
+            /* TODO:
+             * - update the subtable_lookup_func with "name" to "priority"
+             * - iterate the netdevs
+             * --- iterate each dpcls
+             * ----- call subtable_lookup_get_best()
+             */
+        }
+    }
+
+    unixctl_command_reply(conn, NULL);
+}
+
+static void
 dpif_netdev_pmd_rebalance(struct unixctl_conn *conn, int argc,
                           const char *argv[], void *aux OVS_UNUSED)
 {
@@ -1428,6 +1475,10 @@ dpif_netdev_init(void)
                              "on|off [-b before] [-a after] [-e|-ne] "
                              "[-us usec] [-q qlen]",
                              0, 10, pmd_perf_log_set_cmd,
+                             NULL);
+    unixctl_command_register("dpif-netdev/subtable-lookup-set",
+                            "[lookup_func] [prio] [-reprobe -r]",
+                             2, 3, dpif_netdev_subtable_lookup_set,
                              NULL);
     return 0;
 }
@@ -8100,6 +8151,12 @@ dpcls_sort_subtable_vector(struct dpcls *cls)
     PVECTOR_FOR_EACH (subtable, pvec) {
         pvector_change_priority(pvec, subtable, subtable->hit_cnt);
         subtable->hit_cnt = 0;
+
+        /* reprobe to check for better impls */
+        uint32_t u0_bits = subtable->mf_bits_set_unit0;
+        uint32_t u1_bits = subtable->mf_bits_set_unit1;
+        VLOG_INFO("reprobing sub func, %d %d\n", u0_bits, u1_bits);
+        subtable->lookup_func = dpcls_subtable_get_best_impl(u0_bits, u1_bits);
     }
     pvector_publish(pvec);
 }
