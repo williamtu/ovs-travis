@@ -18,6 +18,13 @@ static struct dpcls_subtable_lookup_info_t subtable_lookups[] = {
     { .prio = 1,
       .probe = dpcls_subtable_generic_probe,
       .name = "generic", },
+
+#ifdef __x86_64__
+    /* Only available on x86 64 bit */
+    { .prio = 0,
+      .probe = dpcls_subtable_avx512_gather_probe,
+      .name = "avx512_gather", },
+#endif
 };
 
 int32_t
