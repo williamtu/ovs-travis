@@ -2943,8 +2943,8 @@ emc_change_entry(struct emc_entry *ce, struct dp_netdev_flow *flow,
         }
     }
     if (key) {
-        ce->key.len = key->len;
-        memcpy(&ce->key.mf, &key->mf, key->len);
+        ce->key.len = netdev_flow_key_size(miniflow_n_values(&key->mf));
+        memcpy(&ce->key.mf, &key->mf, ce->key.len);
     }
 }
 
@@ -6728,8 +6728,6 @@ smc_lookup_batch(struct dp_netdev_pmd_thread *pmd,
                     tcp_flags = miniflow_get_tcp_flags(&keys[i].mf);
 
                     /* SMC hit and emc miss, we insert into EMC */
-                    keys[i].len =
-                        netdev_flow_key_size(miniflow_n_values(&keys[i].mf));
                     emc_probabilistic_insert(pmd, &keys[i], flow);
                     /* Add these packets into the flow map in the same order
                      * as received.
@@ -7018,10 +7016,6 @@ fast_path_processing(struct dp_netdev_pmd_thread *pmd,
     int lookup_cnt = 0, add_lookup_cnt;
     bool any_miss;
 
-    for (size_t i = 0; i < cnt; i++) {
-        /* Key length is needed in all the cases, hash computed on demand. */
-        keys[i]->len = netdev_flow_key_size(miniflow_n_values(&keys[i]->mf));
-    }
     /* Get the classifier for the in_port */
     cls = dp_netdev_pmd_lookup_dpcls(pmd, in_port);
     if (OVS_LIKELY(cls)) {
