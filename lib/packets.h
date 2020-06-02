@@ -109,15 +109,16 @@ PADDED_MEMBERS_CACHELINE_MARKER(CACHE_LINE_SIZE, cacheline0,
                                    action. */
     uint32_t skb_priority;      /* Packet priority for QoS. */
     uint32_t pkt_mark;          /* Packet mark. */
+    struct conn *conn;          /* Cached conntrack connection. */
     uint8_t  ct_state;          /* Connection state. */
     bool ct_orig_tuple_ipv6;
     uint16_t ct_zone;           /* Connection zone. */
     uint32_t ct_mark;           /* Connection mark. */
     ovs_u128 ct_label;          /* Connection label. */
     union flow_in_port in_port; /* Input port. */
-    struct conn *conn;          /* Cached conntrack connection. */
     bool reply;                 /* True if reply direction. */
     bool icmp_related;          /* True if ICMP related. */
+    bool tunnel_valid;
 );
 
 PADDED_MEMBERS_CACHELINE_MARKER(CACHE_LINE_SIZE, cacheline1,
@@ -147,6 +148,7 @@ pkt_metadata_init_tnl(struct pkt_metadata *md)
      * are before this and as long as they are empty, the options won't
      * be looked at. */
     memset(md, 0, offsetof(struct pkt_metadata, tunnel.metadata.opts));
+    md->tunnel_valid = true;
 }
 
 static inline void
@@ -158,6 +160,25 @@ pkt_metadata_init_conn(struct pkt_metadata *md)
 static inline void
 pkt_metadata_init(struct pkt_metadata *md, odp_port_t port)
 {
+    /* Initialize only till ct_state. Once the ct_state is zeroed out rest
+     * of ct fields will not be looked at unless ct_state != 0.
+     */
+    memset(md, 0, offsetof(struct pkt_metadata, ct_orig_tuple_ipv6));
+
+    /* It can be expensive to zero out all of the tunnel metadata. However,
+     * we can just zero out ip_dst and the rest of the data will never be
+     * looked at. */
+    md->tunnel_valid = true;
+    md->tunnel.ip_dst = 0;
+    md->tunnel.ipv6_dst = in6addr_any;
+
+    md->in_port.odp_port = port;
+}
+
+/* This function initializes those members used by userspace datapath */
+static inline void
+pkt_metadata_datapath_init(struct pkt_metadata *md, odp_port_t port)
+{
     /* This is called for every packet in userspace datapath and affects
      * performance if all the metadata is initialized. Hence, fields should
      * only be zeroed out when necessary.
@@ -168,12 +189,19 @@ pkt_metadata_init(struct pkt_metadata *md, odp_port_t port)
     memset(md, 0, offsetof(struct pkt_metadata, ct_orig_tuple_ipv6));
 
     /* It can be expensive to zero out all of the tunnel metadata. However,
-     * we can just zero out ip_dst and the rest of the data will never be
-     * looked at. */
+     * we can just clear tunnel_valid */
+    md->tunnel_valid = false;
+
+    md->in_port.odp_port = port;
+}
+
+/* This function initializes tunnel dst for upcall */
+static inline void
+pkt_metadata_tnl_dst_init(struct pkt_metadata *md)
+{
     md->tunnel.ip_dst = 0;
     md->tunnel.ipv6_dst = in6addr_any;
-    md->in_port.odp_port = port;
-    md->conn = NULL;
+    md->tunnel_valid = true;
 }
 
 /* This function prefetches the cachelines touched by pkt_metadata_init()
@@ -190,7 +218,13 @@ pkt_metadata_prefetch_init(struct pkt_metadata *md)
      * in pkt_metadata_init_tnl(). */
     OVS_PREFETCH(md->cacheline1);
 
-    /* Prefetch cachline2 as ip_dst & ipv6_dst fields will be initialized. */
+}
+/* This function prefetches the cachelines touched by miniflow_extract().*/
+static inline void
+pkt_metadata_prefetch(struct pkt_metadata *md)
+{
+    OVS_PREFETCH(md->cacheline0);
+    OVS_PREFETCH(md->cacheline1);
     OVS_PREFETCH(md->cacheline2);
 }
 

@@ -6812,12 +6812,16 @@ dfc_processing(struct dp_netdev_pmd_thread *pmd,
         if (i != cnt - 1) {
             struct dp_packet **packets = packets_->packets;
             /* Prefetch next packet data and metadata. */
-            OVS_PREFETCH(dp_packet_data(packets[i+1]));
-            pkt_metadata_prefetch_init(&packets[i+1]->md);
+            OVS_PREFETCH(dp_packet_data(packets[i + 1]));
+            if (md_is_valid) {
+                pkt_metadata_prefetch(&packets[i + 1]->md);
+            } else {
+                pkt_metadata_prefetch_init(&packets[i + 1]->md);
+            }
         }
 
         if (!md_is_valid) {
-            pkt_metadata_init(&packet->md, port_no);
+            pkt_metadata_datapath_init(&packet->md, port_no);
         }
 
         if ((*recirc_depth_get() == 0) &&
@@ -6916,6 +6920,10 @@ handle_packet_upcall(struct dp_netdev_pmd_thread *pmd,
     match.tun_md.valid = false;
     miniflow_expand(&key->mf, &match.flow);
     memset(&match.wc, 0, sizeof match.wc);
+
+    if (!packet->md.tunnel_valid) {
+        pkt_metadata_tnl_dst_init(&packet->md);
+    }
 
     ofpbuf_clear(actions);
     ofpbuf_clear(put_actions);
