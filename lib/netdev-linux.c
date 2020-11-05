@@ -59,6 +59,7 @@
 #include "openvswitch/hmap.h"
 #include "netdev-afxdp.h"
 #include "netdev-provider.h"
+#include "netdev-qos.h"
 #include "netdev-vport.h"
 #include "netlink-notifier.h"
 #include "netlink-socket.h"
@@ -3611,7 +3612,8 @@ const struct netdev_class netdev_internal_class = {
     .send = netdev_afxdp_batch_send,                            \
     .rxq_construct = netdev_afxdp_rxq_construct,                \
     .rxq_destruct = netdev_afxdp_rxq_destruct,                  \
-    .rxq_recv = netdev_afxdp_rxq_recv
+    .rxq_recv = netdev_afxdp_rxq_recv,                          \
+    .set_policing = netdev_qos_set_policing
 
 const struct netdev_class netdev_afxdp_class = {
     NETDEV_LINUX_CLASS_COMMON,

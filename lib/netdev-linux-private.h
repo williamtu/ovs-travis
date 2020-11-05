@@ -118,6 +118,12 @@ struct netdev_linux {
     bool requested_need_wakeup;
 
     struct netdev_afxdp_tx_lock *tx_locks;  /* Array of locks for TX queues. */
+
+    /* Ingress Policer */
+    OVSRCU_TYPE(struct ingress_policer *) ingress_policer;
+    uint32_t policer_rate;
+    uint32_t policer_burst;
+
 #endif
 };
 
@@ -135,7 +141,7 @@ netdev_linux_cast(const struct netdev *netdev)
     return CONTAINER_OF(netdev, struct netdev_linux, up);
 }
 
-static struct netdev_rxq_linux *
+OVS_UNUSED static struct netdev_rxq_linux *
 netdev_rxq_linux_cast(const struct netdev_rxq *rx)
 {
     ovs_assert(is_netdev_linux_class(netdev_get_class(rx->netdev)));

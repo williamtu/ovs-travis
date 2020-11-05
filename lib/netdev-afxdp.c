@@ -39,6 +39,7 @@
 #include "dp-packet.h"
 #include "dpif-netdev.h"
 #include "fatal-signal.h"
+#include "netdev-qos.h"
 #include "openvswitch/compiler.h"
 #include "openvswitch/dynamic-string.h"
 #include "openvswitch/list.h"
@@ -160,6 +161,7 @@ struct xsk_socket_info {
     uint32_t outstanding_tx; /* Number of descriptors filled in tx and cq. */
     uint32_t available_rx;   /* Number of descriptors filled in rx and fq. */
     atomic_uint64_t tx_dropped;
+    atomic_uint64_t rx_dropped;
 };
 
 struct netdev_afxdp_tx_lock {
@@ -824,9 +826,11 @@ netdev_afxdp_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch,
     struct netdev_linux *dev = netdev_linux_cast(netdev);
     struct xsk_socket_info *xsk_info;
     struct xsk_umem_info *umem;
+    struct ingress_policer *policer;
     uint32_t idx_rx = 0;
     int qid = rxq_->queue_id;
-    unsigned int rcvd, i;
+    unsigned long orig;
+    unsigned int rcvd, i, qos_drop;
 
     xsk_info = dev->xsks[qid];
     if (!xsk_info || !xsk_info->xsk) {
@@ -881,6 +885,16 @@ netdev_afxdp_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch,
         /* TODO: return the number of remaining packets in the queue. */
         *qfill = 0;
     }
+
+    /* RX QoS */
+    policer = ovsrcu_get(struct ingress_policer *, &dev->ingress_policer);
+    if (policer) {
+        qos_drop = rcvd - netdev_qos_ingress_policer_run(policer, batch, true);
+        if (qos_drop > 0) {
+            atomic_add_relaxed(&xsk_info->rx_dropped, qos_drop, &orig);
+        }
+    }
+
     return 0;
 }
 
@@ -1187,6 +1201,8 @@ netdev_afxdp_construct(struct netdev *netdev)
     dev->xsks = NULL;
     dev->tx_locks = NULL;
 
+    ovsrcu_init(&dev->ingress_policer, NULL);
+
     netdev_request_reconfigure(netdev);
     return 0;
 }
@@ -1203,6 +1219,8 @@ netdev_afxdp_destruct(struct netdev *netdev)
         ovsthread_once_done(&once);
     }
 
+    free(ovsrcu_get_protected(struct ingress_policer *,
+                              &dev->ingress_policer));
     /* Note: tc is by-passed when using drv-mode, but when using
      * skb-mode, we might need to clean up tc. */
 
@@ -1317,10 +1335,12 @@ netdev_afxdp_get_stats(const struct netdev *netdev,
         for (i = 0; i < netdev_n_rxq(netdev); i++) {
             xsk_info = dev->xsks[i];
             if (xsk_info) {
-                uint64_t tx_dropped;
+                uint64_t tx_dropped, rx_dropped;
 
                 atomic_read_relaxed(&xsk_info->tx_dropped, &tx_dropped);
+                atomic_read_relaxed(&xsk_info->rx_dropped, &rx_dropped);
                 stats->tx_dropped += tx_dropped;
+                stats->rx_dropped += rx_dropped;
             }
         }
     }
