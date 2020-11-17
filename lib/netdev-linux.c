@@ -3524,6 +3524,19 @@ exit:
     .get_carrier_resets = netdev_linux_get_carrier_resets,      \
     .set_miimon_interval = netdev_linux_set_miimon_interval,    \
     .set_advertisements = netdev_linux_set_advertisements,      \
+    .set_in4 = netdev_linux_set_in4,                            \
+    .get_addr_list = netdev_linux_get_addr_list,                \
+    .add_router = netdev_linux_add_router,                      \
+    .get_next_hop = netdev_linux_get_next_hop,                  \
+    .arp_lookup = netdev_linux_arp_lookup,                      \
+    .update_flags = netdev_linux_update_flags,                  \
+    .rxq_alloc = netdev_linux_rxq_alloc,                        \
+    .rxq_dealloc = netdev_linux_rxq_dealloc,                    \
+    .rxq_wait = netdev_linux_rxq_wait,                          \
+    .rxq_drain = netdev_linux_rxq_drain
+
+#define NETDEV_LINUX_CLASS_BASE                                 \
+    NETDEV_LINUX_CLASS_COMMON,                                  \
     .set_policing = netdev_linux_set_policing,                  \
     .get_qos_types = netdev_linux_get_qos_types,                \
     .get_qos_capabilities = netdev_linux_get_qos_capabilities,  \
@@ -3536,20 +3549,10 @@ exit:
     .queue_dump_start = netdev_linux_queue_dump_start,          \
     .queue_dump_next = netdev_linux_queue_dump_next,            \
     .queue_dump_done = netdev_linux_queue_dump_done,            \
-    .dump_queue_stats = netdev_linux_dump_queue_stats,          \
-    .set_in4 = netdev_linux_set_in4,                            \
-    .get_addr_list = netdev_linux_get_addr_list,                \
-    .add_router = netdev_linux_add_router,                      \
-    .get_next_hop = netdev_linux_get_next_hop,                  \
-    .arp_lookup = netdev_linux_arp_lookup,                      \
-    .update_flags = netdev_linux_update_flags,                  \
-    .rxq_alloc = netdev_linux_rxq_alloc,                        \
-    .rxq_dealloc = netdev_linux_rxq_dealloc,                    \
-    .rxq_wait = netdev_linux_rxq_wait,                          \
-    .rxq_drain = netdev_linux_rxq_drain
+    .dump_queue_stats = netdev_linux_dump_queue_stats
 
 const struct netdev_class netdev_linux_class = {
-    NETDEV_LINUX_CLASS_COMMON,
+    NETDEV_LINUX_CLASS_BASE,
     .type = "system",
     .is_pmd = false,
     .construct = netdev_linux_construct,
@@ -3565,7 +3568,7 @@ const struct netdev_class netdev_linux_class = {
 };
 
 const struct netdev_class netdev_tap_class = {
-    NETDEV_LINUX_CLASS_COMMON,
+    NETDEV_LINUX_CLASS_BASE,
     .type = "tap",
     .is_pmd = false,
     .construct = netdev_linux_construct_tap,
@@ -3580,7 +3583,7 @@ const struct netdev_class netdev_tap_class = {
 };
 
 const struct netdev_class netdev_internal_class = {
-    NETDEV_LINUX_CLASS_COMMON,
+    NETDEV_LINUX_CLASS_BASE,
     .type = "internal",
     .is_pmd = false,
     .construct = netdev_linux_construct,
