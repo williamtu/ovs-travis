@@ -3618,6 +3618,7 @@ const struct netdev_class netdev_internal_class = {
 const struct netdev_class netdev_afxdp_class = {
     NETDEV_LINUX_CLASS_COMMON,
     NETDEV_AFXDP_CLASS_COMMON,
+    NETDEV_QOS_CLASS_COMMON,
     .type = "afxdp",
     .is_pmd = true,
 };

@@ -1049,11 +1049,22 @@ __netdev_afxdp_batch_send(struct netdev *netdev, int qid,
     unsigned long orig;
     uint32_t idx = 0;
     int error = 0;
-    int ret;
+    int ret, qos_drop;
 
     xsk_info = dev->xsks[qid];
     if (!xsk_info || !xsk_info->xsk) {
         goto out;
+    }
+
+    /* TX QoS */
+    qos_drop = dp_packet_batch_size(batch);
+    qos_drop -= netdev_qos_run(dev, batch, true);
+    if (qos_drop > 0) {
+        atomic_add_relaxed(&xsk_info->tx_dropped, qos_drop, &orig);
+
+        if (dp_packet_batch_is_empty(batch)) {
+            return 0;
+        }
     }
 
     afxdp_complete_tx(xsk_info);
@@ -1202,6 +1213,7 @@ netdev_afxdp_construct(struct netdev *netdev)
     dev->tx_locks = NULL;
 
     ovsrcu_init(&dev->ingress_policer, NULL);
+    ovsrcu_init(&dev->qos_conf, NULL);
 
     netdev_request_reconfigure(netdev);
     return 0;

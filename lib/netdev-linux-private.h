@@ -124,6 +124,9 @@ struct netdev_linux {
     uint32_t policer_rate;
     uint32_t policer_burst;
 
+    /* Egress QoS */
+    OVSRCU_TYPE(struct qos_conf *) qos_conf;
+
 #endif
 };
 
