@@ -154,6 +154,10 @@ netdev_tnl_push_ip_header(struct dp_packet *packet,
     struct ip_header *ip;
     struct ovs_16aligned_ip6_hdr *ip6;
 
+    if (userspace_tso_enabled()) {
+        packet_csum_tcpudp(packet);
+    }
+
     eth = dp_packet_push_uninit(packet, size);
     *ip_tot_size = dp_packet_size(packet) - sizeof (struct eth_header);
 
