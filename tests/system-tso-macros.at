@@ -26,6 +26,6 @@ m4_define([OVS_TRAFFIC_VSWITCHD_START],
 #
 # Enable TCP segmentation offload and scatter-gather for veths.
 m4_define([CONFIGURE_VETH_OFFLOADS],
-    [AT_CHECK([ethtool -K $1 sg on], [0], [ignore], [ignore])]
-    [AT_CHECK([ethtool -K $1 tso on], [0], [ignore], [ignore])]
+    [AT_CHECK([ethtool -K $1 sg off], [0], [ignore], [ignore])]
+    [AT_CHECK([ethtool -K $1 tso off], [0], [ignore], [ignore])]
 )

@@ -43,6 +43,7 @@
 #include "seq.h"
 #include "unaligned.h"
 #include "unixctl.h"
+#include "userspace-tso.h"
 #include "openvswitch/vlog.h"
 
 VLOG_DEFINE_THIS_MODULE(native_tnl);
