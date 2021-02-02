@@ -189,7 +189,10 @@ udp_extract_tnl_md(struct dp_packet *packet, struct flow_tnl *tnl,
         return NULL;
     }
 
-    if (udp->udp_csum) {
+    if (userspace_tso_enabled()) {
+        udp->udp_csum = 0;
+        tnl->flags &= ~FLOW_TNL_F_CSUM;
+    } else if (udp->udp_csum) {
         if (OVS_UNLIKELY(!dp_packet_l4_checksum_valid(packet))) {
             uint32_t csum;
             if (netdev_tnl_is_header_ipv6(dp_packet_data(packet))) {

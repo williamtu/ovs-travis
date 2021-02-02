@@ -963,10 +963,6 @@ netdev_push_header(const struct netdev *netdev,
         if (OVS_UNLIKELY(dp_packet_hwol_is_tso(packet)
                          || dp_packet_hwol_l4_mask(packet))) {
             COVERAGE_INC(netdev_push_header_drops);
-            dp_packet_delete(packet);
-            VLOG_WARN_RL(&rl, "%s: Tunneling packets with HW offload flags is "
-                         "not supported: packet dropped",
-                         netdev_get_name(netdev));
         } else {
             netdev->netdev_class->push_header(netdev, packet, data);
             pkt_metadata_init(&packet->md, data->out_port);
