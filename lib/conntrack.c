@@ -1694,6 +1694,7 @@ check_l4_tcp(const struct conn_key *key, const void *data, size_t size,
         return false;
     }
 
+    return true;
     return validate_checksum ? checksum_valid(key, data, size, l3) : true;
 }
 

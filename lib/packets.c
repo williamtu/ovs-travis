@@ -1899,6 +1899,17 @@ packet_dump(struct dp_packet *p, int size)
     return ds_cstr(&ds);
 }
 
+char *
+packet_dump_eth(struct dp_packet *p, int size)
+{
+    struct ds ds;
+
+    ds_init(&ds);
+    ds_put_hex(&ds, dp_packet_eth(p), size);
+
+    return ds_cstr(&ds);
+}
+
 void
 packet_csum_tcpudp(struct dp_packet *p)
 {

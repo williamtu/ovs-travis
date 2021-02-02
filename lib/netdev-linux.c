@@ -1446,7 +1446,6 @@ netdev_linux_batch_rxq_recv_tap(struct netdev_rxq_linux *rx, int mtu,
                          netdev_get_name(netdev_));
             continue;
         }
-
         dp_packet_batch_add(batch, pkt);
     }
 
@@ -1604,7 +1603,21 @@ netdev_linux_tap_batch_send(struct netdev *netdev_, bool tso, int mtu,
         int error;
 
         if (tso) {
+            if (packet->md.tunnel.ip_src != 0) {
+                VLOG_WARN("inner %s", packet_dump(packet, 80));
+//                VLOG_WARN("inner %p %s", packet_dump_eth(packet, 40));
+            }
+            packet_csum_tcpudp(packet);
+            
             netdev_linux_prepend_vnet_hdr(packet, mtu);
+           
+            struct virtio_net_hdr *vnet = dp_packet_data(packet);
+            VLOG_WARN("%s tunnel src/dst ip %x %x", __func__,
+                      packet->md.tunnel.ip_src, packet->md.tunnel.ip_dst);
+            VLOG_WARN("vnet flag %x gso type %x", vnet->flags, vnet->gso_type);
+
+
+
         }
 
         size = dp_packet_size(packet);
