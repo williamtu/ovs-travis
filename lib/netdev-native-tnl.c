@@ -155,16 +155,9 @@ netdev_tnl_push_ip_header(struct dp_packet *packet,
     struct ovs_16aligned_ip6_hdr *ip6;
 
     if (userspace_tso_enabled()) {
-        eth = dp_packet_eth(packet);
-        if (eth->eth_type == htons(ETH_TYPE_IP)) {
-            //ip = dp_packet_l3(packet);
-            //VLOG_WARN("ipproto %d", ip->ip_proto);
-            //if (ip->ip_proto == IPPROTO_UDP) {
-            //    VLOG_WARN("ICMP %s %s", __func__, packet_dump(packet, 60));
-                packet_csum_tcpudp(packet);
-            //    VLOG_WARN("%s %s", __func__, packet_dump(packet, 60));
-            //}
-        }
+        /* Calculate inner header's checksum before pushing outer header.
+         * (Assume the device does not support tnl checksum) */
+        packet_csum_tcpudp(packet);
     }
 
     eth = dp_packet_push_uninit(packet, size);
@@ -203,10 +196,9 @@ udp_extract_tnl_md(struct dp_packet *packet, struct flow_tnl *tnl,
         return NULL;
     }
 
-    if (userspace_tso_enabled()) {
-        udp->udp_csum = 0;
-        tnl->flags &= ~FLOW_TNL_F_CSUM;
-    } else if (udp->udp_csum) {
+    /* 'udp->udp_csum' will be the pseudo header csum when when userspace
+     * TSO is enabled. Skip the validation. */
+    if (udp->udp_csum && !userspace_tso_enabled()) {
         if (OVS_UNLIKELY(!dp_packet_l4_checksum_valid(packet))) {
             uint32_t csum;
             if (netdev_tnl_is_header_ipv6(dp_packet_data(packet))) {
@@ -261,7 +253,7 @@ netdev_tnl_push_udp_header(const struct netdev *netdev OVS_UNUSED,
 {
     struct udp_header *udp;
     int ip_tot_size;
-    
+
     udp = netdev_tnl_push_ip_header(packet, data->header, data->header_len, &ip_tot_size);
 
     /* set udp src port */

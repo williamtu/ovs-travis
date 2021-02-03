@@ -960,9 +960,12 @@ netdev_push_header(const struct netdev *netdev,
     size_t i, size = dp_packet_batch_size(batch);
 
     DP_PACKET_BATCH_REFILL_FOR_EACH (i, size, packet, batch) {
-            netdev->netdev_class->push_header(netdev, packet, data);
-            pkt_metadata_init(&packet->md, data->out_port);
-            dp_packet_batch_refill(batch, packet, i);
+        /* Tunneling packet with HW offload flags is not supported. */
+        *dp_packet_ol_flags_ptr(packet) = 0;
+
+        netdev->netdev_class->push_header(netdev, packet, data);
+        pkt_metadata_init(&packet->md, data->out_port);
+        dp_packet_batch_refill(batch, packet, i);
     }
 
     return 0;

@@ -29,7 +29,7 @@ NS_CHECK_EXEC([at_ns0], [ping -q -c 3 -i 0.3 -w 2 10.1.1.2 | FORMAT_PING], [0], 
 OVS_START_L7([at_ns1], [http])
 NS_CHECK_EXEC([at_ns0], [wget 10.1.1.2 -t 3 -T 1 --retry-connrefused -v -o wget0.log])
 
-NS_CHECK_EXEC([at_ns0], [iperf -s 1> /dev/null &], [0])
+NETNS_DAEMONIZE([at_ns0], [iperf -s], [iperf.pid])
 NS_CHECK_EXEC([at_ns1], [iperf -c 10.1.1.1 -t1 1> /dev/null], [0])
 
 OVS_TRAFFIC_VSWITCHD_STOP(["/.*ethtool command ETHTOOL_G.*/d"])

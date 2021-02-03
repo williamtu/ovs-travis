@@ -1888,28 +1888,6 @@ IP_ECN_set_ce(struct dp_packet *pkt, bool is_ipv6)
     }
 }
 
-char *
-packet_dump(struct dp_packet *p, int size)
-{
-    struct ds ds;
-
-    ds_init(&ds);
-    ds_put_hex(&ds, dp_packet_data(p), size);
-
-    return ds_cstr(&ds);
-}
-
-char *
-packet_dump_eth(struct dp_packet *p, int size)
-{
-    struct ds ds;
-
-    ds_init(&ds);
-    ds_put_hex(&ds, dp_packet_eth(p), size);
-
-    return ds_cstr(&ds);
-}
-
 void
 packet_csum_tcpudp(struct dp_packet *p)
 {
@@ -1929,14 +1907,15 @@ packet_csum_tcpudp(struct dp_packet *p)
     ip = dp_packet_l3(p);
     l4proto = ip->ip_proto;
     l4_size = dp_packet_l4_size(p);
-    pseudo_hdr_csum = packet_csum_pseudoheader(ip);
 
     if (l4proto == IPPROTO_TCP) {
+        pseudo_hdr_csum = packet_csum_pseudoheader(ip);
         tcp = dp_packet_l4(p);
         tcp->tcp_csum = 0;
         tcp->tcp_csum = csum_finish(csum_continue(pseudo_hdr_csum, tcp, l4_size));
 
     } else if (l4proto == IPPROTO_UDP) {
+        pseudo_hdr_csum = packet_csum_pseudoheader(ip);
         udp = dp_packet_l4(p);
         udp->udp_csum = 0;
         udp->udp_csum = csum_finish(csum_continue(pseudo_hdr_csum, udp, l4_size));
