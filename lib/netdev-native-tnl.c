@@ -157,12 +157,12 @@ netdev_tnl_push_ip_header(struct dp_packet *packet,
     if (userspace_tso_enabled()) {
         eth = dp_packet_eth(packet);
         if (eth->eth_type == htons(ETH_TYPE_IP)) {
-            ip = dp_packet_l3(packet);
-            VLOG_WARN("ipproto %d", ip->ip_proto);
+            //ip = dp_packet_l3(packet);
+            //VLOG_WARN("ipproto %d", ip->ip_proto);
             //if (ip->ip_proto == IPPROTO_UDP) {
             //    VLOG_WARN("ICMP %s %s", __func__, packet_dump(packet, 60));
                 packet_csum_tcpudp(packet);
-                VLOG_WARN("%s %s", __func__, packet_dump(packet, 60));
+            //    VLOG_WARN("%s %s", __func__, packet_dump(packet, 60));
             //}
         }
     }
@@ -262,15 +262,11 @@ netdev_tnl_push_udp_header(const struct netdev *netdev OVS_UNUSED,
     struct udp_header *udp;
     int ip_tot_size;
     
-    VLOG_WARN("%s", __func__);
     udp = netdev_tnl_push_ip_header(packet, data->header, data->header_len, &ip_tot_size);
 
     /* set udp src port */
     udp->udp_src = netdev_tnl_get_src_port(packet);
     udp->udp_len = htons(ip_tot_size);
-
-    udp->udp_csum = 0;
-    return;
 
     if (udp->udp_csum) {
         netdev_tnl_calc_udp_csum(udp, packet, ip_tot_size);

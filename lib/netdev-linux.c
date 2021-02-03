@@ -1603,20 +1603,20 @@ netdev_linux_tap_batch_send(struct netdev *netdev_, bool tso, int mtu,
         int error;
 
         if (tso) {
-            if (packet->md.tunnel.ip_src != 0) {
-                VLOG_WARN("inner %s", packet_dump(packet, 80));
+//            if (packet->md.tunnel.ip_src != 0) {
+//                VLOG_WARN("inner %s", packet_dump(packet, 80));
 //                VLOG_WARN("inner %p %s", packet_dump_eth(packet, 40));
-            }
+//            }
             packet_csum_tcpudp(packet);
             
             netdev_linux_prepend_vnet_hdr(packet, mtu);
            
             struct virtio_net_hdr *vnet = dp_packet_data(packet);
+#if 0
             VLOG_WARN("%s tunnel src/dst ip %x %x", __func__,
                       packet->md.tunnel.ip_src, packet->md.tunnel.ip_dst);
             VLOG_WARN("vnet flag %x gso type %x", vnet->flags, vnet->gso_type);
-
-
+#endif
 
         }
 
