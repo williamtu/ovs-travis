@@ -1635,6 +1635,7 @@ void packet_put_ra_prefix_opt(struct dp_packet *,
                               const ovs_be128 router_prefix);
 uint32_t packet_csum_pseudoheader(const struct ip_header *);
 void IP_ECN_set_ce(struct dp_packet *pkt, bool is_ipv6);
+void packet_csum_tcpudp(struct dp_packet *p);
 
 #define DNS_HEADER_LEN 12
 struct dns_header {

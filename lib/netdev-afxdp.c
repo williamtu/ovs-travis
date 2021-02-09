@@ -47,6 +47,7 @@
 #include "ovs-numa.h"
 #include "packets.h"
 #include "socket-util.h"
+#include "userspace-tso.h"
 #include "util.h"
 
 #ifndef SOL_XDP
@@ -867,6 +868,7 @@ netdev_afxdp_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch,
                             FRAME_SIZE - FRAME_HEADROOM,
                             OVS_XDP_HEADROOM);
         dp_packet_set_size(packet, len);
+        *dp_packet_ol_flags_ptr(packet) = 0;
 
         /* Add packet into batch, increase batch->count. */
         dp_packet_batch_add(batch, packet);
@@ -1186,6 +1188,10 @@ netdev_afxdp_construct(struct netdev *netdev)
 
     dev->xsks = NULL;
     dev->tx_locks = NULL;
+
+    if (userspace_tso_enabled()) {
+        netdev->ol_flags = 0;
+    }
 
     netdev_request_reconfigure(netdev);
     return 0;

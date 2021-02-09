@@ -45,3 +45,35 @@ NS_CHECK_EXEC([at_ns0], [ping -q -c 3 -i 0.3 -w 2 10.1.1.2 | FORMAT_PING], [0], 
 
 OVS_TRAFFIC_VSWITCHD_STOP
 AT_CLEANUP
+
+dnl p0 at at_ns0 sends TSO packet to ovs-p0 at OVS.
+dnl ovs-p1 attached to OVS as type=afxdp
+AT_SETUP([AF_XDP - enable userspace TSO])
+AT_KEYWORDS([afxdp tso])
+OVS_TRAFFIC_VSWITCHD_START()
+
+AT_CHECK([ovs-vsctl set Open_vSwitch . other_config:userspace-tso-enable=true])
+AT_CHECK([ovs-ofctl add-flow br0 "actions=normal"])
+
+ADD_NAMESPACES(at_ns0, at_ns1)
+
+dnl Create and add ovs-p0 as system port
+ADD_VETH(p0, at_ns0, br0, "10.1.1.1/24")
+AT_CHECK([ovs-vsctl del-port ovs-p0])
+AT_CHECK([ovs-vsctl add-port br0 ovs-p0])
+dnl Enable tx offload at p0, so ovs-p0 sees TSO packets
+NS_CHECK_EXEC([at_ns0], [ethtool -K p0 tx on > /dev/null 2>&1])
+
+dnl Create and add ovs-p1 as afxdp port
+ADD_VETH(p1, at_ns1, br0, "10.1.1.2/24")
+
+NS_CHECK_EXEC([at_ns0], [ping -q -c 3 -i 0.3 -w 2 10.1.1.2 | FORMAT_PING], [0], [dnl
+3 packets transmitted, 3 received, 0% packet loss, time 0ms
+])
+
+dnl Send a TSO from ns0 to ns1
+NETNS_DAEMONIZE([at_ns1], [iperf -s], [iperf.pid])
+NS_CHECK_EXEC([at_ns0], [iperf -c 10.1.1.2 -t1 1> /dev/null], [0])
+
+OVS_TRAFFIC_VSWITCHD_STOP
+AT_CLEANUP

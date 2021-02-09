@@ -34,6 +34,7 @@
 #include "cmap.h"
 #include "coverage.h"
 #include "dpif.h"
+#include "dp-packet-gso.h"
 #include "dp-packet.h"
 #include "openvswitch/dynamic-string.h"
 #include "fatal-signal.h"
@@ -797,7 +798,6 @@ netdev_send_prepare_packet(const uint64_t netdev_flags,
     if (dp_packet_hwol_is_tso(packet)
         && !(netdev_flags & NETDEV_TX_OFFLOAD_TCP_TSO)) {
             /* Fall back to GSO in software. */
-            VLOG_ERR_BUF(errormsg, "No TSO support");
             return false;
     }
 
@@ -806,8 +806,8 @@ netdev_send_prepare_packet(const uint64_t netdev_flags,
         if (dp_packet_hwol_l4_is_tcp(packet)) {
             if (!(netdev_flags & NETDEV_TX_OFFLOAD_TCP_CKSUM)) {
                 /* Fall back to TCP csum in software. */
-                VLOG_ERR_BUF(errormsg, "No TCP checksum support");
-                return false;
+                packet_csum_tcpudp(packet);
+                return true;
             }
         } else if (dp_packet_hwol_l4_is_udp(packet)) {
             if (!(netdev_flags & NETDEV_TX_OFFLOAD_UDP_CKSUM)) {
@@ -835,7 +835,8 @@ netdev_send_prepare_packet(const uint64_t netdev_flags,
  * otherwise either fall back to software implementation or drop it. */
 static void
 netdev_send_prepare_batch(const struct netdev *netdev,
-                          struct dp_packet_batch *batch)
+                          struct dp_packet_batch *batch,
+                          struct dp_packet_batch *gso_batch)
 {
     struct dp_packet *packet;
     size_t i, size = dp_packet_batch_size(batch);
@@ -846,11 +847,16 @@ netdev_send_prepare_batch(const struct netdev *netdev,
         if (netdev_send_prepare_packet(netdev->ol_flags, packet, &errormsg)) {
             dp_packet_batch_refill(batch, packet, i);
         } else {
-            dp_packet_delete(packet);
-            COVERAGE_INC(netdev_send_prepare_drops);
-            VLOG_WARN_RL(&rl, "%s: Packet dropped: %s",
-                         netdev_get_name(netdev), errormsg);
-            free(errormsg);
+            if (dp_packet_hwol_is_tso(packet) &&
+                !(netdev->ol_flags & NETDEV_TX_OFFLOAD_TCP_TSO)) {
+                dp_packet_batch_add(gso_batch, packet);
+            } else {
+                dp_packet_delete(packet);
+                COVERAGE_INC(netdev_send_prepare_drops);
+                VLOG_WARN_RL(&rl, "%s: Packet dropped: %s",
+                             netdev_get_name(netdev), errormsg);
+                free(errormsg);
+            }
         }
     }
 }
@@ -884,17 +890,67 @@ int
 netdev_send(struct netdev *netdev, int qid, struct dp_packet_batch *batch,
             bool concurrent_txq)
 {
-    int error;
+    struct dp_packet_batch *gso_batch_ptr;
+    struct dp_packet_batch gso_batch;
+    struct dp_packet **gso_pkts;
+    struct dp_packet *packet;
+    uint16_t gso_pkts_len, nb_segs;
+    int error = 0;
 
-    netdev_send_prepare_batch(netdev, batch);
-    if (OVS_UNLIKELY(dp_packet_batch_is_empty(batch))) {
-        return 0;
+    dp_packet_batch_init(&gso_batch);
+    netdev_send_prepare_batch(netdev, batch, &gso_batch);
+
+    if (!dp_packet_batch_is_empty(batch)) {
+        error = netdev->netdev_class->send(netdev, qid, batch, concurrent_txq);
+        if (!error) {
+            COVERAGE_INC(netdev_sent);
+        }
     }
 
-    error = netdev->netdev_class->send(netdev, qid, batch, concurrent_txq);
-    if (!error) {
-        COVERAGE_INC(netdev_sent);
+    if (dp_packet_batch_is_empty(&gso_batch)) {
+        return error;
     }
+    gso_batch_ptr = &gso_batch;
+    DP_PACKET_BATCH_FOR_EACH (i, packet, gso_batch_ptr) {
+        struct dp_packet_batch seg_batch;
+        uint16_t gso_size = 1000; /* How to decide gso_size? */
+
+        gso_pkts_len = 2 * NETDEV_MAX_BURST;
+        gso_pkts = xmalloc(gso_pkts_len * sizeof(struct dp_packet *));
+
+        nb_segs = gso_tcp4_segment(packet, gso_size, gso_pkts, gso_pkts_len);
+        if (nb_segs <= 0) {
+            VLOG_WARN("GSO tcp4 segment failed");
+            dp_packet_delete_batch(gso_batch_ptr, true);
+            return EINVAL;
+        }
+        dp_packet_batch_init(&seg_batch);
+
+        for (i = 0; i < nb_segs; i++) {
+            dp_packet_batch_add(&seg_batch, gso_pkts[i]);
+
+            if (dp_packet_batch_is_full(&seg_batch)) {
+                /* Send the first batch when full. */
+                error = netdev->netdev_class->send(netdev, qid, &seg_batch,
+                                                   concurrent_txq);
+                if (!error) {
+                    COVERAGE_INC(netdev_sent);
+                }
+                dp_packet_batch_init(&seg_batch);
+            }
+        }
+        if (!dp_packet_batch_is_empty(&seg_batch)) {
+            /* Send the rest. */
+            error = netdev->netdev_class->send(netdev, qid, &seg_batch,
+                                               concurrent_txq);
+            if (!error) {
+                COVERAGE_INC(netdev_sent);
+            }
+        }
+
+    }
+    free(gso_pkts);
+
     return error;
 }
 
