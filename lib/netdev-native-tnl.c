@@ -41,6 +41,7 @@
 #include "odp-netlink.h"
 #include "packets.h"
 #include "seq.h"
+#include "userspace-tso.h"
 #include "unaligned.h"
 #include "unixctl.h"
 #include "openvswitch/vlog.h"
@@ -152,8 +153,31 @@ netdev_tnl_push_ip_header(struct dp_packet *packet,
     struct eth_header *eth;
     struct ip_header *ip;
     struct ovs_16aligned_ip6_hdr *ip6;
+    uint16_t inner_l2_5_ofs, inner_l3_ofs, inner_l4_ofs;
+    uint8_t inner_l2_pad_size;
 
+
+    VLOG_WARN("%s", __func__);
+    if (userspace_tso_enabled()) {
+        /* Calculate inner header's checksum before pushing outer header.
+         * (Assume the device does not support tnl checksum) */
+        packet_csum_tcpudp(packet);
+    }
+
+    /* Before push outer header. */
+    inner_l2_pad_size = dp_packet_l2_pad_size(packet);
+    inner_l2_5_ofs = packet->l2_5_ofs;
+    inner_l3_ofs = packet->l3_ofs;
+    inner_l4_ofs = packet->l4_ofs;
+
+    /* Push outer header. */
     eth = dp_packet_push_uninit(packet, size);
+
+    dp_packet_set_inner_l2_pad_size(packet, inner_l2_pad_size);
+    dp_packet_set_inner_l2_5(packet, (char *) eth + size + inner_l2_5_ofs);
+    dp_packet_set_inner_l3(packet, (char *) eth + size + inner_l3_ofs);
+    dp_packet_set_inner_l4(packet, (char *) eth + size + inner_l4_ofs);
+
     *ip_tot_size = dp_packet_size(packet) - sizeof (struct eth_header);
 
     memcpy(eth, header, size);
@@ -189,7 +213,7 @@ udp_extract_tnl_md(struct dp_packet *packet, struct flow_tnl *tnl,
         return NULL;
     }
 
-    if (udp->udp_csum) {
+    if (udp->udp_csum && !userspace_tso_enabled()) {
         if (OVS_UNLIKELY(!dp_packet_l4_checksum_valid(packet))) {
             uint32_t csum;
             if (netdev_tnl_is_header_ipv6(dp_packet_data(packet))) {
@@ -245,6 +269,9 @@ netdev_tnl_push_udp_header(const struct netdev *netdev OVS_UNUSED,
     struct udp_header *udp;
     int ip_tot_size;
 
+    // if inner header is TSO, set outer header to be vxlan tso
+    // basically translate inner header's flags to outer header
+
     udp = netdev_tnl_push_ip_header(packet, data->header, data->header_len, &ip_tot_size);
 
     /* set udp src port */
@@ -253,6 +280,21 @@ netdev_tnl_push_udp_header(const struct netdev *netdev OVS_UNUSED,
 
     if (udp->udp_csum) {
         netdev_tnl_calc_udp_csum(udp, packet, ip_tot_size);
+    }
+
+    if (dp_packet_hwol_is_tso(packet)) {
+        VLOG_WARN("%s: inner is tso, set vxlan tso", __func__);
+        dp_packet_hwol_set_vxlan_tso(packet);
+    } else {
+        uint64_t l4_mask = dp_packet_hwol_l4_mask(packet);
+        if (l4_mask) {
+            if (dp_packet_hwol_l4_is_tcp(packet)) {
+                /* Fix inner csum before output to a tunnel device. */
+                VLOG_WARN("%s tcp, not tso", __func__);
+                VLOG_WARN("fix inner csum before tunnel");
+                packet_csum_tcpudp(packet);
+            }
+        }
     }
 }
 

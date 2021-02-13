@@ -74,6 +74,62 @@ update_ipv4_tcp_headers(const struct dp_packet *src, struct dp_packet **pkts,
 }
 
 static void
+update_tnl_ipv4_tcp_headers(const struct dp_packet *src,
+                            struct dp_packet **pkts, uint16_t nb_segs)
+{
+    struct tcp_header *inner_tcp;
+    struct ip_header *inner_ip, *ip;
+    struct udp_header *udp;
+    struct dp_packet *p;
+    uint32_t tcp_seq, pseudo_hdr_csum;
+    uint16_t inner_ipid, ipid;
+    size_t inner_l4_size;
+    int i;
+
+    ip = dp_packet_l3(src);
+    ipid = ntohs(ip->ip_id);
+    inner_ip = dp_packet_inner_l3(src);
+    inner_ipid = ntohs(inner_ip->ip_id);
+    inner_tcp = dp_packet_inner_l4(src);
+    tcp_seq = ntohl(get_16aligned_be32(&inner_tcp->tcp_seq));
+
+    for (i = 0; i < nb_segs; i++) {
+        p = pkts[i];
+
+        /* Handle outer IP and UDP. */
+        ip = dp_packet_l3(p);
+        ip->ip_tot_len = htons(dp_packet_l3_size(p));
+        ip->ip_id = htons(ipid++);
+        ip->ip_csum = 0;
+        ip->ip_csum = csum(ip, sizeof *ip);
+
+        udp = dp_packet_l4(p);
+        udp->udp_len = htons(dp_packet_l4_size(p));
+        udp->udp_csum = 0;
+
+        /* Handle inner IP and TCP. */
+        inner_ip = dp_packet_inner_l3(p);
+        inner_ip->ip_tot_len = htons(dp_packet_inner_l3_size(p));
+        inner_ip->ip_id = htons(inner_ipid++);
+        inner_ip->ip_csum = 0;
+        inner_ip->ip_csum = csum(inner_ip, sizeof *inner_ip);
+
+        inner_tcp = dp_packet_inner_l4(p);
+        put_16aligned_be32(&inner_tcp->tcp_seq, htonl(tcp_seq));
+
+        pseudo_hdr_csum = packet_csum_pseudoheader(inner_ip);
+        inner_tcp->tcp_csum = 0;
+        inner_l4_size = dp_packet_inner_l4_size(p);
+        inner_tcp->tcp_csum = csum_finish(csum_continue(pseudo_hdr_csum,
+                                                        inner_tcp,
+                                                        inner_l4_size));
+        tcp_seq += (const char *) dp_packet_tail(p) -
+                   (const char *) dp_packet_inner_l4(p) -
+                   TCP_OFFSET(inner_tcp->tcp_ctl) * 4;
+    }
+}
+
+static void
 hdr_segment_init(struct dp_packet *dst, const struct dp_packet *src)
 {
     /* Copy the following fields into the returned buffer: l2_pad_size,
@@ -143,6 +199,33 @@ gso_tcp4_segment(struct dp_packet *p, uint16_t gso_size,
     if (nb_segs > 0) {
         /* Update TCP checksum. */
         update_ipv4_tcp_headers(p, pout, nb_segs);
+    }
+
+    return nb_segs;
+}
+
+// this means UDP tnl, inner has TCP, do segmentation
+// we should also consider ex: GRE tunnel, inner has ETH frame...
+int
+gso_tnl_tcp4_segment(struct dp_packet *p, uint16_t gso_size,
+                     struct dp_packet **pout, uint16_t nb_pout)
+{
+    uint16_t pyld_unit_size, hdr_offset;
+    struct tcp_header *inner_tcp;
+    int nb_segs;
+
+    inner_tcp = (struct tcp_header *) dp_packet_inner_l4(p);
+    hdr_offset = (char *) dp_packet_inner_l4(p) -
+                 (char *) dp_packet_data(p) +
+                 TCP_OFFSET(inner_tcp->tcp_ctl) * 4;
+    VLOG_WARN("hdr_offset %d", hdr_offset);
+
+    // Don't process the packet whose MF bit or offset
+    // in the inner ipv4 header are non-zero
+    pyld_unit_size = gso_size - hdr_offset;
+    nb_segs = gso_do_segment(p, hdr_offset, pyld_unit_size, pout, nb_pout);
+    if (nb_segs > 0) {
+        update_tnl_ipv4_tcp_headers(p, pout, nb_segs);
     }
 
     return nb_segs;

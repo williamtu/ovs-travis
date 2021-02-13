@@ -800,6 +800,13 @@ netdev_send_prepare_packet(const uint64_t netdev_flags,
             /* Fall back to GSO in software. */
             return false;
     }
+    if (dp_packet_hwol_is_vxlan_tso(packet)
+        && !(netdev_flags & NETDEV_TX_OFFLOAD_VXLAN_TSO)) {
+
+        VLOG_WARN("Got VXLAN TSO! --> convert to VXLAN GSO");
+        VLOG_ERR_BUF(errormsg, "No VXLAN TSO support");
+        return false;
+    }
 
     l4_mask = dp_packet_hwol_l4_mask(packet);
     if (l4_mask) {
@@ -819,6 +826,7 @@ netdev_send_prepare_packet(const uint64_t netdev_flags,
             if (!(netdev_flags & NETDEV_TX_OFFLOAD_SCTP_CKSUM)) {
                 /* Fall back to SCTP csum in software. */
                 VLOG_ERR_BUF(errormsg, "No SCTP checksum support");
+                // false means drop and delete packet
                 return false;
             }
         } else {
@@ -847,7 +855,11 @@ netdev_send_prepare_batch(const struct netdev *netdev,
         if (netdev_send_prepare_packet(netdev->ol_flags, packet, &errormsg)) {
             dp_packet_batch_refill(batch, packet, i);
         } else {
-            if (dp_packet_hwol_is_tso(packet) &&
+            if (dp_packet_hwol_is_vxlan_tso(packet) &&
+                !(netdev->ol_flags & NETDEV_TX_OFFLOAD_VXLAN_TSO)) {
+                VLOG_WARN("Add to vxlan gso");
+                dp_packet_batch_add(gso_batch, packet);
+            } else if (dp_packet_hwol_is_tso(packet) &&
                 !(netdev->ol_flags & NETDEV_TX_OFFLOAD_TCP_TSO)) {
                 dp_packet_batch_add(gso_batch, packet);
             } else {
@@ -900,6 +912,8 @@ netdev_send(struct netdev *netdev, int qid, struct dp_packet_batch *batch,
     dp_packet_batch_init(&gso_batch);
     netdev_send_prepare_batch(netdev, batch, &gso_batch);
 
+// serialize all packets....
+// create multiple batch
     if (!dp_packet_batch_is_empty(batch)) {
         error = netdev->netdev_class->send(netdev, qid, batch, concurrent_txq);
         if (!error) {
@@ -918,7 +932,14 @@ netdev_send(struct netdev *netdev, int qid, struct dp_packet_batch *batch,
         gso_pkts_len = 2 * NETDEV_MAX_BURST;
         gso_pkts = xmalloc(gso_pkts_len * sizeof(struct dp_packet *));
 
-        nb_segs = gso_tcp4_segment(packet, gso_size, gso_pkts, gso_pkts_len);
+        if (dp_packet_hwol_is_vxlan_tso(packet)) {
+            nb_segs = gso_tnl_tcp4_segment(packet, gso_size, gso_pkts,
+                                           gso_pkts_len);
+            VLOG_WARN("%s: tnl: nb_segs %d", __func__, nb_segs);
+        } else {
+            nb_segs = gso_tcp4_segment(packet, gso_size, gso_pkts,
+                                       gso_pkts_len);
+        }
         if (nb_segs <= 0) {
             VLOG_WARN("GSO tcp4 segment failed");
             dp_packet_delete_batch(gso_batch_ptr, true);
@@ -1016,6 +1037,7 @@ netdev_push_header(const struct netdev *netdev,
     size_t i, size = dp_packet_batch_size(batch);
 
     DP_PACKET_BATCH_REFILL_FOR_EACH (i, size, packet, batch) {
+        /*
         if (OVS_UNLIKELY(dp_packet_hwol_is_tso(packet)
                          || dp_packet_hwol_l4_mask(packet))) {
             COVERAGE_INC(netdev_push_header_drops);
@@ -1024,10 +1046,10 @@ netdev_push_header(const struct netdev *netdev,
                          "not supported: packet dropped",
                          netdev_get_name(netdev));
         } else {
+        */
             netdev->netdev_class->push_header(netdev, packet, data);
             pkt_metadata_init(&packet->md, data->out_port);
             dp_packet_batch_refill(batch, packet, i);
-        }
     }
 
     return 0;

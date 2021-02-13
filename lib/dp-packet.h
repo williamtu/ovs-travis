@@ -81,6 +81,14 @@ enum dp_packet_offload_mask {
     DEF_OL_FLAG(DP_PACKET_OL_TX_UDP_CKSUM, PKT_TX_UDP_CKSUM, 0x400),
     /* Offload SCTP checksum. */
     DEF_OL_FLAG(DP_PACKET_OL_TX_SCTP_CKSUM, PKT_TX_SCTP_CKSUM, 0x800),
+    /* VxLAN TCP Segmentation Offload. */
+    DEF_OL_FLAG(DP_PACKET_OL_TX_TNL_VXLAN, PKT_TX_TUNNEL_VXLAN, 0x1000),
+    /* UDP Segmentation Offload. */
+    DEF_OL_FLAG(DP_PACKET_OL_TX_UDP_SEG, PKT_TX_UDP_SEG, 0x2000),
+    /* Outer L3 Type IPv4 for Tunnel Offload. */
+    DEF_OL_FLAG(DP_PACKET_OL_TX_OUTER_IPV4, PKT_TX_OUTER_IPV4, 0x4000),
+    /* Outer L3 Type IPv6 for Tunnel Offload. */
+    DEF_OL_FLAG(DP_PACKET_OL_TX_OUTER_IPV6, PKT_TX_OUTER_IPV6, 0x8000),
     /* Adding new field requires adding to DP_PACKET_OL_SUPPORTED_MASK. */
 };
 
@@ -95,7 +103,11 @@ enum dp_packet_offload_mask {
                                      DP_PACKET_OL_TX_IPV6          | \
                                      DP_PACKET_OL_TX_TCP_CKSUM     | \
                                      DP_PACKET_OL_TX_UDP_CKSUM     | \
-                                     DP_PACKET_OL_TX_SCTP_CKSUM)
+                                     DP_PACKET_OL_TX_SCTP_CKSUM    | \
+                                     DP_PACKET_OL_TX_TNL_VXLAN     | \
+                                     DP_PACKET_OL_TX_UDP_SEG       | \
+                                     DP_PACKET_OL_TX_OUTER_IPV4    | \
+                                     DP_PACKET_OL_TX_OUTER_IPV6)
 
 #define DP_PACKET_OL_TX_L4_MASK (DP_PACKET_OL_TX_TCP_CKSUM | \
                                  DP_PACKET_OL_TX_UDP_CKSUM | \
@@ -132,6 +144,13 @@ struct dp_packet {
                                     * or UINT16_MAX. */
     uint16_t l4_ofs;               /* Transport-level header offset,
                                       or UINT16_MAX. */
+    uint8_t inner_l2_pad_size;
+    uint16_t inner_l2_5_ofs;
+    uint16_t inner_l3_ofs;
+    uint16_t inner_l4_ofs;
+    //uint16_t inner_proto;         // then based on inner protocol type to decide gso func.
+    //bool encapsulation;           // like skb->encapsulation
+    // see skb_udp_tunnel_segment
     uint32_t cutlen;               /* length in bytes to cut from the end. */
     ovs_be32 packet_type;          /* Packet type as defined in OpenFlow */
     union {
@@ -504,6 +523,96 @@ dp_packet_get_nd_payload(const struct dp_packet *b)
 {
     return OVS_LIKELY(dp_packet_l4_size(b) >= ND_MSG_LEN)
         ? (const char *)dp_packet_l4(b) + ND_MSG_LEN : NULL;
+}
+
+static inline void
+dp_packet_reset_inner_offsets(struct dp_packet *b)
+{
+    b->inner_l2_pad_size = 0;
+    b->inner_l2_5_ofs = UINT16_MAX;
+    b->inner_l3_ofs = UINT16_MAX;
+    b->inner_l4_ofs = UINT16_MAX;
+}
+
+static inline uint8_t
+dp_packet_inner_l2_pad_size(const struct dp_packet *b)
+{
+    return b->inner_l2_pad_size;
+}
+
+static inline void
+dp_packet_set_inner_l2_pad_size(struct dp_packet *b, uint8_t pad_size)
+{
+    ovs_assert(pad_size <= dp_packet_size(b));
+    b->inner_l2_pad_size = pad_size;
+}
+
+static inline void *
+dp_packet_inner_l2_5(const struct dp_packet *b)
+{
+    return b->inner_l2_5_ofs != UINT16_MAX
+           ? (char *) dp_packet_data(b) + b->inner_l2_5_ofs
+           : NULL;
+}
+
+static inline void
+dp_packet_set_inner_l2_5(struct dp_packet *b, void *l2_5)
+{
+    b->inner_l2_5_ofs = l2_5
+                  ? (char *) l2_5 - (char *) dp_packet_data(b)
+                  : UINT16_MAX;
+}
+
+static inline void *
+dp_packet_inner_l3(const struct dp_packet *b)
+{
+    return b->inner_l3_ofs != UINT16_MAX
+           ? (char *) dp_packet_data(b) + b->inner_l3_ofs
+           : NULL;
+}
+
+static inline void
+dp_packet_set_inner_l3(struct dp_packet *b, void *l3)
+{
+    b->inner_l3_ofs = l3 ? (char *) l3 - (char *) dp_packet_data(b) : UINT16_MAX;
+}
+
+static inline void *
+dp_packet_inner_l4(const struct dp_packet *b)
+{
+    return b->inner_l4_ofs != UINT16_MAX
+           ? (char *) dp_packet_data(b) + b->inner_l4_ofs
+           : NULL;
+}
+
+static inline void
+dp_packet_set_inner_l4(struct dp_packet *b, void *l4)
+{
+    b->inner_l4_ofs = l4 ? (char *) l4 - (char *) dp_packet_data(b) : UINT16_MAX;
+}
+
+/* Returns the size of the packet from the beginning of the L3 header to the
+ * end of the L3 payload.  Hence L2 padding is not included. */
+static inline size_t
+dp_packet_inner_l3_size(const struct dp_packet *b)
+{
+    return OVS_LIKELY(b->inner_l3_ofs != UINT16_MAX)
+        ? (const char *)dp_packet_tail(b) -
+          (const char *)dp_packet_inner_l3(b) -
+          dp_packet_inner_l2_pad_size(b)
+        : 0;
+}
+
+/* Returns the size of the packet from the beginning of the L4 header to the
+ * end of the L4 payload.  Hence L2 padding is not included. */
+static inline size_t
+dp_packet_inner_l4_size(const struct dp_packet *b)
+{
+    return OVS_LIKELY(b->l4_ofs != UINT16_MAX)
+        ? (const char *)dp_packet_tail(b) -
+          (const char *)dp_packet_inner_l4(b) -
+          dp_packet_inner_l2_pad_size(b)
+        : 0;
 }
 
 #ifdef DPDK_NETDEV
@@ -1071,6 +1180,29 @@ dp_packet_l4_checksum_bad(const struct dp_packet *p)
     return (*dp_packet_ol_flags_ptr(p) & DP_PACKET_OL_RX_L4_CKSUM_MASK) ==
             DP_PACKET_OL_RX_L4_CKSUM_BAD;
 }
+
+static inline void
+dp_packet_hwol_set_vxlan_tso(struct dp_packet *p)
+{
+    *dp_packet_ol_flags_ptr(p) |= DP_PACKET_OL_TX_TNL_VXLAN;
+}
+
+static inline bool
+dp_packet_hwol_is_vxlan_tso(const struct dp_packet *p)
+{
+    return (*dp_packet_ol_flags_ptr(p) & DP_PACKET_OL_TX_TNL_VXLAN) ==
+            DP_PACKET_OL_TX_TNL_VXLAN;
+}
+/*
+static inline void
+dp_packet_hwol_set_ufo
+
+static inline void 
+dp_packet_hwol_set_tx_outer_ipv4
+
+static inline void
+dp_packet_hwol_set_tx_outer_ipv6
+*/
 
 #ifdef  __cplusplus
 }

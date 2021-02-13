@@ -24,4 +24,8 @@ int gso_tcp4_segment(struct dp_packet *p, uint16_t gso_size,
                      struct dp_packet **pouts, uint16_t nb_pouts);
 int gso_udp4_segment(struct dp_packet *p, uint16_t gso_size,
                      struct dp_packet **pouts, uint16_t nb_pouts);
+
+int gso_tnl_tcp4_segment(struct dp_packet *p, uint16_t gso_size,
+                         struct dp_packet **pouts, uint16_t nb_pouts);
+
 #endif /* dp-packet-gso.h */

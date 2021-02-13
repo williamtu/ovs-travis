@@ -1604,6 +1604,7 @@ netdev_linux_tap_batch_send(struct netdev *netdev_, bool tso, int mtu,
         int error;
 
         if (tso) {
+            packet_csum_tcpudp(packet);
             netdev_linux_prepend_vnet_hdr(packet, mtu);
         }
 
